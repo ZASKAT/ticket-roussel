@@ -782,3 +782,106 @@ J'ai créé [ticket-4.md](boutique-roussel/tickets/ticket-4.md) avec les mêmes 
 - **ETAPES** : la reproduction pas à pas, avec le moment exact où la petite devient grande, et le fait que recharger la page fait disparaître le bug.
 - **ATTENDU** : le tableau des tests, tous OK après la correction.
 - **CODE_CONCERNE** : les trois fichiers concernés, le mécanisme de l'objet partagé, la correction dans le panier et l'option écartée.
+
+
+# Ticket 5:
+
+Ticket 5 : un bouquet supprimé, tout le panier vidé
+Bonjour, une cliente avait mis trois bouquets différents dans son panier. Elle a voulu retirer le premier 
+avec le bouton « Supprimer » : les trois ont disparu. Elle a cru à une panne et elle est partie sans 
+commander.
+
+# Réponse:
+
+Le ticket ne décrit qu'un seul cas : supprimer le **premier** bouquet. Pour comprendre une règle, il faut faire varier ce cas.
+
+## 1. Reproduire en faisant varier la position
+Mets trois bouquets différents dans le panier (A, B, C), puis note ce qui reste après chaque essai :
+1. supprimer le **premier** (A) ;
+2. recommencer, et supprimer celui **du milieu** (B) ;
+3. recommencer, et supprimer le **dernier** (C) ;
+4. recommencer, et faire descendre la quantité de B à 0 avec le bouton **−**.
+
+Cherche la règle : est-ce que tout disparaît à chaque fois, ou est-ce que ça dépend de la position ?
+
+## 2. Ce que fait le code
+- Le bouton « Supprimer » appelle `quandActionPanier` ([app.js:75](boutique-roussel/js/app.js#L75)), qui appelle `supprimerLigne(index)`. `index` est la position de la ligne : 0 pour la première, 1 pour la deuxième, etc.
+- `supprimerLigne` ([panier.js:40](boutique-roussel/js/panier.js#L40)) retire la ligne de la liste avec la fonction JavaScript `splice`.
+- `changerQuantite` ([panier.js:30](boutique-roussel/js/panier.js#L30)) appelle aussi `supprimerLigne` quand la quantité arrive à 0.
+
+## 3. Hypothèses
+1. Le clic sur « Supprimer » est déclenché plusieurs fois, comme au ticket 2.
+2. Le bouton envoie une mauvaise position (`index`).
+3. `supprimerLigne` retire plus d'une ligne à la fois.
+
+Pour chacune, demande-toi quel résultat elle donnerait aux 4 essais. Par exemple, avec l'hypothèse 1, supprimer le dernier bouquet en ferait-il disparaître plusieurs ?
+
+## 4. Utiliser la documentation (ou l'IA)
+`splice` est une fonction standard de JavaScript. Quand une fonction du langage te semble suspecte, ne devine pas son comportement : vérifie-le.
+- Cherche « splice MDN » : MDN est la documentation de référence du JavaScript.
+- Ou demande à une IA : « Que fait `tableau.splice(index)` quand on ne lui donne qu'un seul argument ? »
+
+Compare ensuite ce que tu as appris avec les résultats de tes 4 essais. Note tes observations dans diagnostic.md, puis donne-moi ta conclusion.
+
+
+# Ma réponse:
+
+hypothèse 3, splice sans 2e argument supprime tout après l'index
+
+# Réponse:
+
+Exactement. `splice(index)` retire la ligne à cette position **et toutes celles qui suivent**. Ça explique les résultats des essais :
+- supprimer le premier (position 0) retire tout le panier : c'est le cas de la cliente ;
+- supprimer celui du milieu retire le milieu et le dernier ;
+- supprimer le dernier ne retire que lui. C'est pour ça que le bug peut passer inaperçu si on teste seulement avec le dernier bouquet.
+
+Les hypothèses 1 et 2 ne donneraient pas ce motif « tout ce qui suit disparaît ».
+
+## La correction
+Le deuxième argument de `splice` est le **nombre** de lignes à retirer. Dans [panier.js:41](boutique-roussel/js/panier.js#L41), ajoute-le pour ne retirer qu'une ligne : `splice(index, 1)`.
+
+`changerQuantite` utilise aussi `supprimerLigne` quand la quantité tombe à 0. La correction règle donc aussi le bouton −.
+
+## Les tests après
+| Action (panier A, B, C) | Attendu |
+|---|---|
+| Supprimer A | il reste B et C |
+| Supprimer B | il reste A et C |
+| Supprimer C | il reste A et B (non-régression) |
+| Faire descendre B à 0 avec − | il reste A et C |
+| Supprimer les trois un par un | le panier est vide, le message « panier vide » s'affiche |
+| Recharger la page après une suppression | les lignes restantes sont toujours là |
+
+## Ce que ce ticket ajoute à ta méthode
+Faire varier le cas du ticket (premier, milieu, dernier) révèle une **règle**, pas seulement un symptôme. Et quand une fonction du langage est en cause, la documentation donne la réponse sûre, là où une supposition peut se tromper.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+Bravo, le ticket 5 est résolu. J'ai vérifié ta ligne dans panier.js : `lignes.splice(index, 1);` est correct.
+
+## Récapitulatif
+- **Symptôme** : supprimer le premier de trois bouquets vidait tout le panier.
+- **Cause** : `supprimerLigne` appelait `splice(index)` sans deuxième argument, ce qui retire la ligne visée **et toutes les suivantes**.
+- **Pourquoi le bug pouvait passer inaperçu** : supprimer le dernier bouquet marchait normalement.
+- **Correction** : `splice(index, 1)` dans [panier.js:41](boutique-roussel/js/panier.js#L41), qui ne retire qu'une ligne. Le bouton − en profite aussi, car il passe par la même fonction.
+
+Veux-tu que je synthétise le ticket 5 dans tickets/ticket-5.md ?
+
+
+# Ma réponse:
+
+oui, synthétise le ticket 5 dans ticket-5.md
+
+# Réponse:
+
+J'ai créé [ticket-5.md](boutique-roussel/tickets/ticket-5.md) avec les mêmes 4 sections que les tickets précédents :
+
+- **SYMPTOME** : le panier entier vidé en supprimant le premier bouquet.
+- **ETAPES** : la reproduction, et un tableau des essais par position (premier, milieu, dernier, bouton −) qui fait apparaître la règle.
+- **ATTENDU** : le tableau des tests, tous OK après la correction.
+- **CODE_CONCERNE** : `supprimerLigne` et `changerQuantite` dans panier.js, la correction `splice(index, 1)` et la vérification dans la documentation.
