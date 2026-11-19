@@ -38,3 +38,11 @@ export function creer(balise, classes, texte) {
   if (texte !== undefined) element.textContent = texte;
   return element;
 }
+
+// Date au format "2026-11-16", en heure locale.
+export function dateIso(date) {
+  const annee = date.getFullYear();
+  const mois = String(date.getMonth() + 1).padStart(2, "0");
+  const jour = String(date.getDate()).padStart(2, "0");
+  return annee + "-" + mois + "-" + jour;
+}

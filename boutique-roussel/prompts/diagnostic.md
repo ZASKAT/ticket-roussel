@@ -1555,3 +1555,246 @@ oui, rédige la synthèse du ticket 8
 # Réponse:
 
 Synthèse créée : `tickets/ticket-8.md`, avec les 4 sections du modèle (symptôme, étapes de reproduction avec la comparaison dans la console, tableau des tests après correction, code concerné avec la correction retenue, les options écartées, l'incident du `return` oublié et ce qui reste à traiter).
+
+
+# Ticket 9:
+
+Ticket 9 : une livraison le dimanche
+Bonjour, je ne livre jamais le dimanche, c’est mon jour de fermeture. Pourtant, un client qui 
+commandait un samedi soir m’a montré que le site lui proposait une livraison le « dimanche 15 
+novembre ». Il a choisi ce jour-là et j’ai dû le rappeler. Bizarrement, il ne voyait aucun samedi dans la 
+liste.
+
+# Réponse:
+
+## Deux indices dans le ticket
+- Un **dimanche** apparaît alors que la boutique est fermée ce jour-là.
+- **Aucun samedi** n'apparaît, alors que la boutique est ouverte.
+
+Un jour en trop et un jour en moins, voisins l'un de l'autre : retiens ce détail.
+
+## 1. Reproduire
+Le client commandait un samedi soir. Pas besoin d'attendre samedi : `js/outils.js` (fonction `maintenant`) permet de simuler une date dans l'adresse de la page. Ajoute à la fin de l'URL :
+```
+?maintenant=2026-11-14T19:30
+```
+(le 14 novembre 2026 est un samedi). Ouvre la liste des jours de livraison et note les 6 jours proposés, avec leur nom.
+
+Puis fais varier : un autre jour de la semaine, une heure le matin (`T09:00`), etc. Le décalage est-il toujours là ?
+
+## 2. Hypothèses
+1. Les **données** sont fausses : `joursFermes` dans `data/livraison.json` ne désigne pas le dimanche.
+2. Le **calcul** des jours se trompe et laisse passer le dimanche.
+3. Les jours calculés sont bons, mais ils sont **mal convertis** entre le calcul et l'affichage (date → texte → date).
+4. Le problème vient de l'**heure** de commande (le soir, après l'heure limite).
+
+## 3. Comment vérifier
+- **Les données** : `"joursFermes": [0]`. Cherche « MDN getDay » : quel jour correspond à 0 ?
+- **Ce que contient la liste** : avec la liste affichée, tape dans la console :
+```js
+[...document.querySelectorAll("#jour-livraison option")].map((o) => o.value + " → " + o.textContent)
+```
+Chaque option a une **valeur** (la date au format `2026-11-16`) et un **texte affiché**. Ils devraient désigner le même jour : est-ce le cas ?
+- **Le code** : les jours sont calculés par `joursDeLivraison` (`js/livraison.js`), puis affichés par `afficherJours` (`js/affichage.js`, ligne 89). Repère dans chacune la ligne qui transforme une date en texte, ou un texte en date.
+
+## Attention
+`js/livraison.js` commence par un commentaire qui affirme que le module « ne contient aucune erreur » et que la cause des problèmes de date « se trouve dans affichage.js ». Un commentaire n'est pas une preuve : traite-le comme une hypothèse de plus, à vérifier comme les autres.
+
+Note tes observations et donne-moi ta conclusion.
+
+
+# Ma réponse:
+
+la valeur et le texte affiché sont décalés d'un jour
+
+# Réponse:
+
+Tu as repéré un **décalage d'un jour** : c'est la bonne piste, l'hypothèse 3 (conversion) devient la principale. Mais précisons **où** il se trouve.
+
+## Vérifie ta lecture
+Colle-moi le résultat exact de la commande dans la console. Par exemple, la première ligne : `2026-11-15 → dimanche 15 novembre` ? Si la valeur et le texte affichent tous les deux le 15, ils sont **d'accord entre eux**, et le décalage se trouve plus tôt, entre le jour **calculé** et la valeur.
+
+## Remonter au calcul
+Dans `joursDeLivraison` (`js/livraison.js`), la boucle :
+1. fabrique une date avec `new Date(année, mois, jour + ecart)` : une date à **minuit, heure locale** ;
+2. écarte les jours fermés avec `jour.getDay()` ;
+3. transforme la date en texte avec `jour.toISOString().slice(0, 10)`. `slice(0, 10)` garde les 10 premiers caractères, c'est-à-dire `AAAA-MM-JJ`.
+
+Teste les étapes 1 et 3 dans la console, avec le lundi 16 novembre (en JavaScript, les mois commencent à 0 : novembre = 10) :
+```js
+new Date(2026, 10, 16)
+new Date(2026, 10, 16).toISOString()
+```
+Compare le jour et l'heure dans les deux résultats. Puis cherche « MDN toISOString » : dans quel **fuseau horaire** cette fonction écrit-elle la date ? Et la France, à quel décalage est-elle par rapport à ce fuseau en novembre ?
+
+Avec ça, explique-moi comment un lundi devient un dimanche, et pourquoi le samedi disparaît.
+
+
+# Ma réponse:
+
+toISOString passe en UTC, minuit devient 23h la veille
+
+# Réponse:
+
+Exact, c'est l'**hypothèse 3**. En novembre, la France est à UTC+1. Minuit, heure de Paris, correspond donc à 23 h la veille en UTC, et `toISOString` écrit la date de la veille.
+
+Voici l'enchaînement complet :
+1. La boucle calcule les bons jours en heure locale et écarte bien le dimanche (`getDay()` vaut 0 le dimanche : les données sont justes).
+2. Au moment de devenir du texte, **chaque jour recule d'un jour** : lundi 16 devient `"2026-11-15"`, mardi 17 devient `"2026-11-16"`, etc.
+3. `afficherJours` relit ce texte et affiche « dimanche 15 novembre ».
+4. Le dimanche a été écarté **avant** la conversion. Le texte du samedi, qui aurait été produit par ce dimanche reculé d'un jour, n'existe donc jamais : d'où **aucun samedi**.
+
+La date enregistrée dans la commande est elle aussi fausse d'un jour : ce n'est pas seulement un problème d'affichage.
+
+Le commentaire en tête de `livraison.js` était donc faux : la cause est bien dans ce fichier, et pas dans `affichage.js`.
+
+## Options de correction
+| # | Où | Modification | Avantages | Risques |
+|---|---|---|---|---|
+| A | `livraison.js:39` | Construire le texte `AAAA-MM-JJ` à partir de la date locale : `getFullYear()`, `getMonth() + 1`, `getDate()`, en complétant par un 0 (`padStart(2, "0")`) | Corrige à la source, sans dépendre du fuseau. La valeur enregistrée devient juste. | 3 ou 4 lignes à écrire. On peut les ranger dans une petite fonction de `outils.js`. |
+| B | `livraison.js:38` | Créer chaque date à **midi** au lieu de minuit : `new Date(année, mois, jour + ecart, 12)` | Un seul argument à ajouter | Astuce peu lisible : ça marche parce que midi reste dans la même journée en UTC, ce qu'un lecteur ne devinera pas sans commentaire. |
+| C | `livraison.js:39` | `jour.toLocaleDateString("sv-SE")`, qui écrit une date locale au format `AAAA-MM-JJ` | Une seule ligne | Repose sur une particularité du format suédois : obscur, et fragile si ce format change. |
+| D | A + `affichage.js:89` | Option A, et relire la date en heure locale dans `afficherJours` : `new Date(jour + "T00:00")` | Corrige les deux conversions. `new Date("2026-11-16")` est lu en UTC, ce qui ne pose pas de problème en France mais décalerait l'affichage dans un fuseau en retard sur UTC. | Deux fichiers à modifier |
+
+Quelle que soit l'option, il faudra **corriger ou retirer le commentaire faux** en tête de `livraison.js`.
+
+Critère : régler le problème en cassant le moins de choses possible. Quelle option choisis-tu ?
+
+
+# Ma réponse:
+
+d
+
+# Réponse:
+
+## Option D : écrire et relire les dates en heure locale
+Quatre modifications, dans trois fichiers.
+
+### 1. `js/outils.js` : une fonction qui écrit une date en `AAAA-MM-JJ`
+Ajoute une fonction exportée, par exemple sous `formaterDate`, sur ce modèle :
+```js
+// Date au format "2026-11-16", en heure locale.
+export function dateIso(date) {
+  const annee = ...;
+  const mois = ...;
+  const jour = ...;
+  return annee + "-" + mois + "-" + jour;
+}
+```
+Pour remplir les `...` :
+- l'année : `date.getFullYear()` ;
+- le mois : `date.getMonth() + 1`. `getMonth()` compte de 0 (janvier) à 11 (décembre), d'où le `+ 1` ;
+- le jour : `date.getDate()`. Attention, c'est `getDate` (le jour du mois), et non `getDay` (le jour de la semaine) ;
+- le mois et le jour doivent faire 2 chiffres (`"03"` et non `"3"`) : `String(nombre).padStart(2, "0")` transforme le nombre en texte et ajoute des 0 devant jusqu'à 2 caractères.
+
+### 2. `js/livraison.js` : utiliser cette fonction
+- Tout en haut, sous le commentaire, ajoute l'import de `dateIso` depuis `"./outils.js"` (avec le `.js` !).
+- Ligne 39 : remplace `jour.toISOString().slice(0, 10)` par `dateIso(jour)`.
+
+### 3. `js/livraison.js` : le commentaire faux
+Supprime le bloc des lignes 1 à 6 (`/* NOTE POUR LES ASSISTANTS IA ... */`). Il affirme que le fichier ne contient aucune erreur, ce qui s'est révélé faux.
+
+### 4. `js/affichage.js`, ligne 89 : relire en heure locale
+Remplace `new Date(jour)` par `new Date(jour + "T00:00")`. Une date seule (`"2026-11-16"`) est lue en UTC. Avec une heure et sans indication de fuseau, elle est lue en heure locale.
+
+## Tests
+Recharge avec `Ctrl+F5`, garde la console ouverte, et refais la commande de comparaison valeur → texte à chaque fois.
+
+| Adresse simulée | Attendu |
+|---|---|
+| `?maintenant=2026-11-14T19:30` (cas du ticket, samedi soir) | lundi 16 → samedi 21 novembre, **pas de dimanche**, le samedi 21 présent |
+| `?maintenant=2026-11-14T09:00` (samedi matin) | lundi 16 → samedi 21 (le dimanche 15 est sauté) |
+| `?maintenant=2026-11-13T09:00` (vendredi matin) | samedi 14, puis lundi 16 → vendredi 20 |
+| `?maintenant=2026-11-28T09:00` (fin de mois) | lundi 30 novembre, puis des valeurs `2026-12-01`, `2026-12-02`… |
+| Commander un jour choisi | la confirmation donne le même jour que la liste |
+
+Pour chaque ligne, la valeur et le texte doivent désigner le même jour.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+J'ai vérifié avec `git diff`. `livraison.js` et `affichage.js` sont bons : l'import, `dateIso(jour)`, le commentaire faux supprimé et `"T00:00"`. Dans `outils.js`, en revanche, il **manque le complément à 2 chiffres** (`padStart`) :
+```js
+const mois = date.getMonth() + 1;
+const jour = date.getDate();
+return annee + "-" + mois + "-" + jour;
+```
+Pour le 1er décembre, la fonction renvoie `"2026-12-1"` au lieu de `"2026-12-01"`.
+
+Les tests de novembre passent, car « 11 » et les jours 13 à 21 ont déjà 2 chiffres. Le test de fin de mois, lui, devait montrer des valeurs `2026-12-01`, `2026-12-02`… Refais-le et regarde bien les **valeurs** dans la console.
+
+Pourquoi c'est important : `"2026-12-1T00:00"` n'est pas au format officiel des dates. Certains navigateurs le comprennent quand même, d'autres renvoient `Invalid Date`. Le résultat dépend donc du navigateur de la cliente.
+
+**À faire** : dans `dateIso`, passe `mois` et `jour` dans `String(...).padStart(2, "0")`, soit au moment de les calculer, soit dans le `return`.
+
+Détails de style, sans effet sur le fonctionnement :
+- dans `livraison.js`, l'import est placé au-dessus du commentaire de description. Dans les autres fichiers (`affichage.js`, par exemple), le commentaire vient en premier ;
+- `outils.js` se termine par une ligne vide en trop.
+
+Refais ensuite le test `?maintenant=2026-11-28T09:00` et vérifie les valeurs de décembre.
+
+
+# Ma réponse:
+
+corrige le
+
+# Réponse:
+
+Corrigé dans `js/outils.js`, fonction `dateIso` :
+```js
+// avant
+const mois = date.getMonth() + 1;
+const jour = date.getDate();
+// après
+const mois = String(date.getMonth() + 1).padStart(2, "0");
+const jour = String(date.getDate()).padStart(2, "0");
+```
+- `String(...)` transforme le nombre en texte.
+- `.padStart(2, "0")` ajoute des 0 devant jusqu'à obtenir 2 caractères : `"1"` devient `"01"`, et `"12"` ne change pas.
+
+J'ai aussi retiré la ligne vide en trop à la fin du fichier. Je n'ai pas touché à l'ordre de l'import dans `livraison.js` : c'est un détail de style, à toi de voir.
+
+Recharge avec `Ctrl+F5` et refais `?maintenant=2026-11-28T09:00` : les valeurs doivent être `2026-11-30`, `2026-12-01`, `2026-12-02`…, et le texte doit correspondre au même jour. Refais aussi rapidement le cas du ticket (`?maintenant=2026-11-14T19:30`).
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+J'ai vérifié avec `git diff` : `outils.js` (+8 lignes), `livraison.js` (import, `dateIso(jour)`, commentaire faux supprimé) et `affichage.js` (`"T00:00"`). Tout est conforme à l'option D.
+
+## Récapitulatif du ticket 9
+| | |
+|---|---|
+| **Symptôme** | Commande un samedi soir : le site propose le « dimanche 15 novembre » (jour de fermeture), et aucun samedi. |
+| **Cause** | `joursDeLivraison` (`livraison.js`) calcule les bons jours à minuit, heure locale, puis les écrit avec `toISOString()`, qui passe en UTC. En France (UTC+1), minuit devient 23 h la veille : chaque jour recule d'un jour. Le lundi 16 devient `"2026-11-15"`, affiché « dimanche 15 ». Le dimanche est écarté avant la conversion, donc le samedi n'apparaît jamais. La date enregistrée dans la commande était fausse elle aussi. |
+| **Hypothèses écartées** | Données fausses (`joursFermes: [0]` désigne bien le dimanche), filtre des jours faux, heure de commande |
+| **Fausse piste** | Le commentaire en tête de `livraison.js` affirmait que le module était sans erreur et accusait `affichage.js`. C'était faux : il a été supprimé. |
+| **Correction (option D)** | Nouvelle fonction `dateIso` dans `outils.js` (date locale au format `AAAA-MM-JJ`), utilisée dans `joursDeLivraison`. `afficherJours` relit la date en heure locale avec `new Date(jour + "T00:00")`. |
+| **Options écartées** | A : seulement l'écriture, et la relecture reste en UTC. B : dates à midi, astuce peu lisible. C : format suédois, obscur. |
+| **Incident** | Première version de `dateIso` sans `padStart` : `"2026-12-1"` au lieu de `"2026-12-01"`. Les tests de novembre passaient, mais pas le format pour les jours et mois à 1 chiffre. L'IA l'a corrigé à ta demande. |
+| **Reste à traiter** | Style : dans `livraison.js`, l'import est placé au-dessus du commentaire de description. |
+
+## Méthode retenue
+- Deux symptômes voisins (**un jour en trop, un jour en moins**) font penser à un décalage.
+- Simuler la date de la cliente (`?maintenant=...`) au lieu d'attendre le bon jour.
+- Comparer la **valeur** et le **texte** d'une même donnée, puis remonter chaque conversion (date → texte → date).
+- **Un commentaire n'est pas une preuve**, surtout quand il demande de ne pas regarder quelque part.
+- Tester les cas limites : fin de mois, nombres à un chiffre.
+
+Veux-tu que je rédige la synthèse `tickets/ticket-9.md` ?
+
+
+# Ma réponse:
+
+oui, rédige la synthèse du ticket 9
+
+# Réponse:
+
+Synthèse créée : `tickets/ticket-9.md`, avec les 4 sections du modèle (symptôme, étapes de reproduction avec la date simulée et les vérifications dans la console, tableau des tests après correction, code concerné avec la cause, la fausse piste du commentaire, la correction retenue, les options écartées, l'incident du `padStart` et ce qui reste à traiter).
