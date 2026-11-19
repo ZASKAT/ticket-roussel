@@ -12,7 +12,7 @@ export function chargerPromos(liste) {
 // Applique un code promo à un sous-total.
 // Renvoie { valide, remise, message }.
 export function appliquerPromo(saisie, montant) {
-  const regle = promos.find((promo) => promo.code === saisie);
+  const regle = promos.find((promo) => promo.code === saisie.trim().toUpperCase());
   if (!regle) {
     return { valide: false, remise: 0, message: "Ce code promo n'existe pas." };
   }
