@@ -62,6 +62,8 @@ function remplirFormulaire() {
   document.querySelector("#option-vase").checked = options.vase;
   document.querySelector("#option-carte").checked = options.carte;
   document.querySelector("#message-carte").value = options.message;
+  document.querySelector("#compteur-carte").textContent =
+    options.message.length + " / " + reglesOptions.carte.longueurMax + " caractères";
   document.querySelector("#zone-message").hidden = !options.carte;
 }
 
@@ -72,6 +74,8 @@ function lireFormulaire() {
   options.vase = document.querySelector("#option-vase").checked;
   options.carte = document.querySelector("#option-carte").checked;
   const message = document.querySelector("#message-carte").value;
+  document.querySelector("#compteur-carte").textContent =
+    message.length + " / " + reglesOptions.carte.longueurMax + " caractères";
   options.message = options.carte ? message.slice(0, reglesOptions.carte.longueurMax) : "";
   document.querySelector("#zone-message").hidden = !options.carte;
   afficherPrixComposition();

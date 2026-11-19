@@ -1142,3 +1142,416 @@ oui, rédige la synthèse du ticket 6
 # Réponse:
 
 Synthèse créée : `tickets/ticket-6.md`, avec les 4 sections du modèle (symptôme, étapes de reproduction avec la vérification dans la console, tableau des tests après correction, code concerné avec la correction retenue, les options écartées, les deux incidents et ce qui reste à traiter).
+
+
+# Ticket 7:
+
+Ticket 7 : le message de la carte coupé
+Bonjour, une cliente voulait écrire un long message sur la carte, pour un mariage. Le site l’a bloquée au 
+milieu de sa phrase. Pouvez-vous enlever cette limite ? Mes clientes doivent pouvoir écrire ce qu’elles 
+veulent.
+
+# Réponse:
+
+## Ce ticket est différent
+La fleuriste ne décrit pas un calcul faux : elle **demande de changer une règle** (« enlever cette limite »). Avant de toucher au code, il faut répondre à une question : cette limite est-elle une erreur, ou a-t-elle une raison d'exister ?
+
+## 1. Reproduire
+1. Choisis un bouquet et coche « Carte avec votre message ».
+2. Colle un long texte dans le champ (plusieurs phrases).
+3. Note où le texte s'arrête. Dans la console (`F12`), compte les caractères :
+```js
+document.querySelector("#message-carte").value.length
+```
+4. Essaie aussi de taper au clavier une fois la limite atteinte. Le site te prévient-il de quelque chose ?
+
+## 2. Hypothèses
+1. La limite est une **erreur** : elle a été mise trop bas, ou par accident.
+2. La limite est **volontaire** et a une raison : la taille de la carte imprimée, un format de transmission, etc.
+3. Le vrai problème n'est pas la limite, mais le fait que **la cliente n'est pas prévenue** : rien ne lui dit combien de caractères il lui reste.
+
+## 3. Où chercher
+- Cherche dans le projet (`Ctrl+Shift+F`) le nombre que tu as trouvé à l'étape 1.
+- Cherche aussi `maxLength`. Dans un champ HTML, cet attribut fixe le nombre maximum de caractères qu'on peut saisir.
+- Regarde où cette valeur est définie (code ou données ?) et à combien d'endroits elle est utilisée.
+
+## 4. Question pour la démarche
+Une fois la limite trouvée : **qui peut savoir pourquoi elle existe ?** Le code peut te dire *comment* la limite fonctionne, mais pas forcément *pourquoi* elle a été mise.
+
+Donne-moi tes observations et ce que tu en conclus.
+
+
+# Ma réponse:
+
+la limite est de 150 caractères, définie dans catalogue.json
+
+# Réponse:
+
+Exact : `"longueurMax": 150` dans `data/catalogue.json`, dans l'option `carte`.
+
+Point important : la valeur est rangée dans les **données**, à côté du prix et du libellé de la carte. Comme au ticket 3, ça ressemble plus à un choix de la boutique qu'à une erreur de code. Il reste trois points avant de conclure.
+
+## 1. Où la valeur est utilisée
+La valeur est définie dans le JSON, mais c'est le code qui l'applique. Cherche `longueurMax` dans `js/` : tu dois trouver **deux** endroits. Pour chacun, regarde ce qu'il fait au message.
+
+Pour t'aider à lire :
+- `element.maxLength = ...` règle l'attribut HTML `maxlength` : le navigateur refuse les caractères en trop pendant la saisie.
+- `texte.slice(0, n)` garde seulement les `n` premiers caractères d'un texte.
+
+## 2. Hypothèse 3 : la cliente est-elle prévenue ?
+Pendant ta reproduction, quand tu as atteint 150 caractères, as-tu vu un message, un compteur ou une indication ? Note ce que tu as observé.
+
+## 3. Hypothèses 1 et 2 : erreur ou choix ?
+Le code ne dit pas pourquoi la limite vaut 150. Quelle question poserais-tu à la fleuriste avant de l'enlever ? Pense à ce que devient le message une fois la commande passée.
+
+Donne-moi ces trois réponses, et je te proposerai les options.
+
+
+# Ma réponse:
+
+pas de message, aucun compteur, la saisie bloque sans prévenir
+
+# Réponse:
+
+Bonne observation : l'**hypothèse 3 est confirmée**. La cliente arrive à 150 caractères sans le savoir, et le clavier cesse simplement de répondre. De son point de vue, c'est une panne : d'où le « bloquée au milieu de sa phrase ».
+
+Cela change la lecture du ticket. La fleuriste demande « enlever la limite », mais ce dont la cliente a souffert, c'est **de ne pas avoir été prévenue**.
+
+Il reste deux points avant les options :
+
+## 1. Les deux endroits qui utilisent `longueurMax`
+Cherche `longueurMax` dans `js/composition.js` : une ligne bloque la saisie, l'autre coupe le message. Pourquoi, à ton avis, le code fait-il les deux ? Pense à ce qui se passe si on colle un texte, ou si on enlève un seul des deux.
+
+## 2. La question à poser à la fleuriste
+Avant d'enlever la limite, il faut savoir pourquoi elle existe. Qu'est-ce qui, dans la vraie boutique, pourrait limiter la longueur d'un message sur une carte ?
+
+
+# Ma réponse:
+
+la taille physique de la carte limite le texte
+
+# Réponse:
+
+Exact. Si on enlève la limite, une cliente pourra écrire 600 caractères qui ne tiendront jamais sur la carte : la fleuriste devra couper le message à la main ou rappeler la cliente. **La limite n'est pas un bug, c'est une contrainte réelle.** Le bug, c'est que la cliente n'est pas prévenue (hypothèse 3).
+
+## Les deux lignes qui appliquent la limite (`js/composition.js`)
+- **Ligne 36** : `maxLength = reglesOptions.carte.longueurMax` règle l'attribut `maxlength` du champ. Le navigateur refuse alors tout caractère au-delà de 150, au clavier comme au collage. C'est ce qui « bloque sans prévenir ».
+- **Ligne 75** : `message.slice(0, ...longueurMax)` garde seulement les 150 premiers caractères du message enregistré dans les options. C'est une sécurité côté JavaScript, au cas où le champ contiendrait quand même plus (par exemple si quelqu'un modifie le HTML avec les outils du navigateur).
+
+Les deux lisent la même valeur dans `catalogue.json` : changer la limite se fait donc à **un seul endroit**.
+
+## Options de correction
+| # | Modification | Avantages | Risques |
+|---|---|---|---|
+| A | Supprimer la limite (comme demandé) | Répond à la lettre au ticket | Messages trop longs pour la carte : le problème passe de la cliente à la fleuriste. Si on retire seulement la valeur du JSON, `maxLength` peut recevoir `undefined` et le champ risque de ne plus rien accepter : il faut alors modifier aussi les deux lignes du code. |
+| B | Augmenter la valeur dans `catalogue.json` | Une seule donnée modifiée, pas de code | Il faut connaître la vraie capacité de la carte. La cliente reste bloquée sans prévenir, juste plus loin. |
+| C | Ajouter un compteur sous le champ (« 87 / 150 caractères ») | Corrige la vraie cause : la cliente voit la limite arriver. Garde la contrainte de la carte. | Touche `index.html` (un élément pour afficher le compteur) et `composition.js` (mise à jour à chaque saisie). Un écouteur `input` existe déjà sur le champ. |
+| D | B + C | Plus de place et une cliente prévenue | Les deux modifications à faire, et la bonne valeur à demander à la fleuriste |
+
+Dans tous les cas, **la fleuriste doit être prévenue** : sa demande littérale (« enlever la limite ») n'est peut-être pas la meilleure réponse, et c'est à elle de donner la capacité réelle de la carte.
+
+Quelle option choisis-tu ?
+
+
+# Ma réponse:
+
+option C
+
+# Réponse:
+
+## Option C : un compteur sous le champ du message
+Trois modifications.
+
+### 1. `index.html` : prévoir l'emplacement du compteur
+Dans `<div id="zone-message">`, juste **après** la ligne `<textarea id="message-carte" ...></textarea>`, ajoute un paragraphe vide qui recevra le texte :
+```html
+<p id="compteur-carte" class="mt-1 text-sm"></p>
+```
+Il est dans `zone-message`, donc il sera caché quand la carte n'est pas cochée.
+
+### 2. `js/composition.js`, fonction `lireFormulaire` : mettre le compteur à jour
+Cette fonction est appelée à chaque frappe dans le champ (écouteur `input`, ligne 39). Juste après la ligne `const message = ...`, ajoute une ligne qui écrit dans `#compteur-carte` (avec `.textContent =`) un texte composé de :
+- le nombre de caractères tapés : `message.length` ;
+- `" / "` ;
+- la limite : `reglesOptions.carte.longueurMax` ;
+- `" caractères"`.
+
+En JavaScript, on assemble des morceaux de texte avec `+`. Tu as un modèle juste au-dessus, lignes 34-35 (`#libelle-carte`).
+
+### 3. `js/composition.js`, fonction `remplirFormulaire` : le compteur à l'ouverture
+Quand on ouvre un autre bouquet, le message est vidé, mais le compteur garderait l'ancien nombre. Ajoute la même ligne dans `remplirFormulaire`, avec `options.message.length` à la place de `message.length` (dans cette fonction, la variable `message` n'existe pas).
+
+## Tests à faire ensuite
+- Cocher la carte : le compteur affiche `0 / 150 caractères`.
+- Taper du texte : le compteur augmente à chaque caractère.
+- Coller un long texte : le compteur s'arrête à `150 / 150`.
+- Effacer du texte : le compteur diminue.
+- Décocher la carte : le compteur disparaît avec le champ.
+- Ouvrir un autre bouquet : le compteur est revenu à `0 / 150`.
+- Ajouter au panier avec un message : le reste fonctionne comme avant.
+
+Recharge avec `Ctrl+F5` et garde la console ouverte.
+
+
+# Ma réponse:
+
+corrige
+
+# Réponse:
+
+Le HTML était bon (`<p id="compteur-carte">` ajouté au bon endroit). Dans `js/composition.js`, les deux lignes que tu avais commencées étaient incomplètes, ce qui cassait la page :
+```js
+document.querySelector("#compteur-carte")textContent ;
+```
+Il manquait le point avant `textContent`, puis `=` et le texte à afficher. Je les ai complétées :
+
+```js
+// dans remplirFormulaire
+document.querySelector("#compteur-carte").textContent =
+  options.message.length + " / " + reglesOptions.carte.longueurMax + " caractères";
+
+// dans lireFormulaire, juste après const message = ...
+document.querySelector("#compteur-carte").textContent =
+  message.length + " / " + reglesOptions.carte.longueurMax + " caractères";
+```
+J'ai aussi retiré une ligne vide et des espaces en trop en fin de ligne dans `remplirFormulaire`.
+
+Recharge avec `Ctrl+F5`, garde la console ouverte et refais les tests :
+- cocher la carte ;
+- taper, puis effacer ;
+- coller un long texte ;
+- décocher la carte ;
+- ouvrir un autre bouquet ;
+- ajouter au panier.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+Vérifié avec `git diff` : seuls `index.html` (+1 ligne) et `js/composition.js` (+4 lignes) ont changé. `catalogue.json` n'a pas été touché : la limite de 150 reste en place.
+
+## Récapitulatif du ticket 7
+| | |
+|---|---|
+| **Demande** | Enlever la limite du message de la carte : une cliente a été bloquée au milieu de sa phrase. |
+| **Diagnostic** | La limite (`"longueurMax": 150` dans `catalogue.json`) est volontaire : c'est la place disponible sur la carte. Elle est appliquée deux fois dans `composition.js` : `maxLength` bloque la saisie (ligne 36) et `slice` coupe le message enregistré (ligne 79). Le vrai défaut : rien ne prévient la cliente, et la saisie s'arrête sans message. |
+| **Correction (option C)** | Un compteur « n / 150 caractères » sous le champ : un `<p id="compteur-carte">` dans `index.html`, mis à jour dans `lireFormulaire` (à chaque frappe) et dans `remplirFormulaire` (à l'ouverture d'un bouquet). |
+| **Options écartées** | A : supprimer la limite (messages trop longs pour la carte). B : augmenter la valeur (la cliente reste bloquée sans prévenir). D : B + C (il faut connaître la vraie capacité de la carte). |
+| **Incident** | Les lignes du compteur étaient incomplètes (point et `=` manquants), ce qui cassait la page. Elles ont été complétées par l'IA, à ta demande. |
+| **Reste à traiter** | Répondre à la fleuriste : la limite est gardée, et voici pourquoi. Lui demander la capacité réelle de la carte : si elle dépasse 150 caractères, il suffit de changer la valeur dans `catalogue.json`. |
+
+## Méthode retenue
+- Un ticket peut être une **demande de changement**, pas un bug. Avant d'obéir à la lettre, chercher pourquoi la règle existe.
+- Distinguer **ce que demande** la personne (« enlever la limite ») de **ce dont elle souffre** (ne pas être prévenue).
+- Le code dit *comment* une règle fonctionne, pas toujours *pourquoi* : la réponse peut être chez la personne qui connaît le métier.
+
+Veux-tu que je rédige la synthèse `tickets/ticket-7.md` ?
+
+
+# Ma réponse:
+
+oui, rédige la synthèse du ticket 7
+
+# Réponse:
+
+Synthèse créée : `tickets/ticket-7.md`, avec les 4 sections du modèle (symptôme et nature du ticket, étapes de reproduction, tableau des tests après correction, code concerné avec la correction retenue, les options écartées, l'incident et ce qui reste à traiter).
+
+
+# Ticket 8:
+
+Ticket 8 : livrée le matin au lieu de l’après-midi
+Bonjour, une cliente avait choisi une livraison l’après-midi, parce qu’elle travaille le matin. Le message 
+de confirmation disait « matin », et c’est aussi ce qui était écrit dans la commande que j’ai reçue. Mon 
+livreur est passé le matin : personne. Elle a dû venir chercher son bouquet à la boutique.
+
+# Réponse:
+
+## Ce que dit le ticket
+- La cliente a choisi **après-midi**.
+- La confirmation affichée **et** la commande reçue disaient **matin**.
+
+L'erreur est donc déjà là au moment de la confirmation : le livreur n'y est pour rien.
+
+## 1. Reproduire et faire varier
+Mets un bouquet dans le panier, saisis un code postal livré (37000) et choisis un jour. Puis :
+
+| Essai | Moment choisi | Ce que dit la confirmation |
+|---|---|---|
+| 1 | Après-midi | ? |
+| 2 | Matin | ? |
+| 3 | Après-midi, en cliquant sur le texte plutôt que sur le rond | ? |
+
+## 2. Hypothèses
+1. Le clic sur « Après-midi » n'est pas pris en compte : le bouton reste ou revient sur « Matin ».
+2. Le choix est bien coché, mais le code qui écrit la confirmation **ne lit pas le bon bouton**.
+3. Les libellés sont inversés dans les données : le bouton « après-midi » porte la valeur du matin.
+4. Quelque chose remet le choix à zéro entre le clic et la confirmation.
+
+## 3. Comment vérifier
+- **À l'écran** : juste avant de cliquer sur « Commander », le rond « Après-midi » est-il bien coché ?
+- **Dans la console** (`F12`), après avoir choisi « Après-midi » et **avant** de commander :
+```js
+document.querySelectorAll("input[name=moment]")
+```
+Cette commande liste tous les boutons « moment ». Déplie chacun et regarde ses propriétés `value` et `checked`.
+- **Dans les données** : regarde la partie `moments` de `data/livraison.json`.
+- **Dans le code** : la confirmation est écrite dans la fonction `commander` de `js/app.js`. Repère la variable utilisée pour le moment dans le message, puis remonte jusqu'à la ligne qui la définit.
+
+Avec ces observations, élimine les hypothèses une par une et donne-moi ta conclusion.
+
+
+# Ma réponse:
+
+la confirmation dit toujours matin, même avec après-midi coché
+
+# Réponse:
+
+Bonne observation : « toujours matin », quel que soit le choix. Le résultat ne dépend donc pas du tout de ce que coche la cliente.
+
+## Ce que ça élimine
+- **Hypothèse 1** (le clic n'est pas pris en compte) : éliminée, puisque « Après-midi » est bien coché à l'écran.
+
+## Ce qu'il reste à départager
+- **Hypothèse 3** (données inversées) : tu as ouvert `livraison.json`. Dans `moments`, l'ordre et les libellés sont-ils cohérents ? Et si les données étaient inversées, l'essai « Matin » afficherait-il quand même « matin » ?
+- **Hypothèse 2** (le code ne lit pas le bon bouton) : dans `js/app.js`, fonction `commander`, la confirmation utilise la variable `moment` (ligne 138). Elle est définie ligne 123 :
+```js
+const moment = document.querySelector("input[name=moment]");
+```
+`input[name=moment]` désigne tous les champs `<input>` dont l'attribut `name` vaut `moment`. Il y en a deux sur la page.
+
+## Vérification dans la console
+Coche « Après-midi », puis tape ces deux lignes, l'une après l'autre :
+```js
+document.querySelector("input[name=moment]").value
+document.querySelector("input[name=moment]:checked").value
+```
+Compare les deux résultats. Ensuite, cherche « MDN querySelector » et lis ce que la fonction renvoie quand **plusieurs** éléments correspondent.
+
+Donne-moi ta conclusion.
+
+
+# Ma réponse:
+
+querySelector renvoie seulement le premier bouton, donc toujours matin
+
+# Réponse:
+
+Exact : c'est l'**hypothèse 2**. `querySelector` renvoie le **premier** élément de la page qui correspond au sélecteur, qu'il soit coché ou non. Le premier bouton « moment » est « Matin » (c'est l'ordre de `livraison.json`), donc la confirmation dit toujours « matin ».
+
+L'hypothèse 3 est éliminée : les données sont cohérentes (`matin` → « Matin », `apres-midi` → « Après-midi »). L'hypothèse 4 aussi : le bouton reste coché jusqu'au clic sur « Commander ».
+
+À savoir pour les options : dans `js/affichage.js` (fonction `afficherMoments`, ligne 104), `radio.checked = index === 0` coche « Matin » par défaut. Il y a donc **toujours** un bouton coché.
+
+## Options de correction
+| # | Où | Modification | Avantages | Risques |
+|---|---|---|---|---|
+| A | `app.js:123` | Ajouter `:checked` au sélecteur : `"input[name=moment]:checked"` | Quelques caractères, rien d'autre ne change. La ligne 138 (`moment.nextSibling...`) continue de fonctionner, sur le bon bouton. | Si aucun bouton n'était coché, `moment` vaudrait `null` et la ligne 138 provoquerait une erreur. Ce n'est pas possible aujourd'hui, grâce au « Matin » coché par défaut. |
+| B | `app.js:123` | `querySelectorAll(...)` puis chercher celui qui a `checked` à `true` | Même résultat que A | Plus long pour le même effet |
+| C | `app.js` | Mémoriser le moment dans `etat` à chaque changement (écouteur `change`) | Le choix est disponible partout dans le code | Plus de code : un écouteur à ajouter, pour un besoin qu'une seule ligne couvre |
+| D | `app.js:123` + vérification | Option A, et un message « Choisissez un moment de livraison » si rien n'est coché, comme pour le jour | Protège contre le cas `null` si le « coché par défaut » est un jour retiré | Une condition de plus à écrire |
+
+Critère : régler le problème en cassant le moins de choses possible. Quelle option choisis-tu ?
+
+
+# Ma réponse:
+
+D
+
+# Réponse:
+
+## Option D : lire le bouton coché, et vérifier qu'il existe
+Deux modifications, toutes les deux dans la fonction `commander` de `js/app.js`.
+
+### 1. Ligne 123 : lire le bouton coché
+Ajoute `:checked` juste après `input[name=moment]`, à l'intérieur des guillemets. `:checked` limite la recherche aux boutons cochés. Si aucun n'est coché, `querySelector` renvoie `null`.
+
+### 2. Vérifier qu'un moment est choisi
+La fonction contient déjà trois vérifications, construites de la même façon : panier vide, code postal, jour. Regarde celle du jour (lignes 132-135) :
+```js
+if (!jour.value) {
+  message.textContent = "Choisissez un jour de livraison.";
+  return;
+}
+```
+- `!` veut dire « non » : la condition est vraie quand il n'y a pas de valeur.
+- `return` arrête la fonction : la commande n'est pas confirmée.
+
+Juste **après** ce bloc, ajoute le même bloc pour le moment. Deux changements :
+- la condition porte sur `moment` lui-même, pas sur `.value`, car c'est `moment` qui vaut `null` quand rien n'est coché ;
+- le message devient « Choisissez un moment de livraison. ».
+
+## Tests
+Recharge avec `Ctrl+F5` et garde la console ouverte.
+- Après-midi coché : la confirmation dit « après-midi ».
+- Matin coché : la confirmation dit « matin ».
+- Aucun moment coché : un bouton radio ne se décoche pas au clic, donc simule-le dans la console avant de commander :
+```js
+document.querySelectorAll("input[name=moment]").forEach((radio) => radio.checked = false)
+```
+Le message attendu est « Choisissez un moment de livraison. », sans erreur dans la console.
+- Panier vide, code postal manquant, jour manquant : les messages habituels s'affichent toujours.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+J'ai vérifié avec `git diff` (`js/app.js`). La ligne 123 est bonne (`:checked`). Mais dans le nouveau bloc, il **manque le `return;`** :
+```js
+if (!moment) {
+  message.textContent = "Choisissez un moment de livraison."
+}
+```
+Sans `return`, la fonction continue après le message. Elle arrive à la ligne de confirmation, qui lit `moment.nextSibling` alors que `moment` vaut `null` : cela provoque une erreur.
+
+À l'écran, le test semble réussi : le message « Choisissez un moment… » reste affiché, parce que l'erreur arrête tout avant que la confirmation ne le remplace. En revanche, la console doit montrer une erreur rouge `TypeError: Cannot read properties of null`.
+
+**À faire** : ajoute `return;` dans le bloc, sous la ligne du message, comme dans le bloc du jour. Ajoute aussi le `;` à la fin de la ligne du message, pour suivre le style du fichier.
+
+Puis refais le test « aucun moment coché » **en regardant la console** : le message doit s'afficher, et aucune erreur ne doit apparaître.
+
+Remarque : le diff montre aussi une ligne 44 modifiée (des espaces retirés sur une ligne vide). C'est sans effet sur le fonctionnement.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+J'ai vérifié avec `git diff` (`js/app.js`) : `:checked` à la ligne 123, et le bloc de vérification avec son `return;`. Le code fonctionne.
+
+Détails de style, sans effet sur le fonctionnement : le `;` manque toujours à la fin de la ligne du message, il reste un espace après le `}`, et des lignes vides entourent le bloc alors que les trois autres vérifications n'en ont pas. Tu peux les aligner sur le reste de la fonction si tu veux.
+
+## Récapitulatif du ticket 8
+| | |
+|---|---|
+| **Symptôme** | Une cliente a choisi « après-midi », mais la confirmation et la commande disaient « matin ». Le livreur est passé le matin, et personne n'était là. |
+| **Reproduction** | La confirmation dit toujours « matin », quel que soit le moment coché. |
+| **Cause** | `commander` (`app.js:123`) lisait le moment avec `querySelector("input[name=moment]")`, qui renvoie le **premier** bouton de la page (« Matin »), coché ou non. |
+| **Hypothèses écartées** | Clic non pris en compte (le bouton est bien coché), données inversées (`livraison.json` est cohérent), choix remis à zéro avant la confirmation |
+| **Correction (option D)** | `:checked` ajouté au sélecteur, et une vérification « Choisissez un moment de livraison. » si aucun bouton n'est coché, sur le modèle de celle du jour |
+| **Options écartées** | A : `:checked` seul, sans protection contre `null`. B : `querySelectorAll` + recherche, plus long pour le même effet. C : mémoriser le moment dans `etat`, trop de code. |
+| **Incident** | Le premier essai n'avait pas de `return;` : le message s'affichait, mais une erreur `TypeError` apparaissait dans la console. Le test semblait réussi à l'écran. |
+| **Reste à traiter** | Rien pour ce bug. La cliente qui a dû venir chercher son bouquet attend peut-être un geste commercial : c'est à la fleuriste de voir. |
+
+## Méthode retenue
+- « **Toujours** le même résultat, quel que soit le choix » : le code ne lit pas le choix de la cliente.
+- Comparer dans la console deux versions d'une même instruction (`querySelector` avec et sans `:checked`).
+- Un test réussi à l'écran ne suffit pas : **regarder aussi la console**, qui peut montrer une erreur cachée.
+
+Veux-tu que je rédige la synthèse `tickets/ticket-8.md` ?
+
+
+# Ma réponse:
+
+oui, rédige la synthèse du ticket 8
+
+# Réponse:
+
+Synthèse créée : `tickets/ticket-8.md`, avec les 4 sections du modèle (symptôme, étapes de reproduction avec la comparaison dans la console, tableau des tests après correction, code concerné avec la correction retenue, les options écartées, l'incident du `return` oublié et ce qui reste à traiter).

@@ -41,7 +41,7 @@ async function demarrer() {
     rafraichir();
   });
   document.querySelector("#bouton-commander").addEventListener("click", commander);
-  
+
   // Les boutons + , − et Supprimer de toutes les lignes (écouteur posé une seule fois).
   document.querySelector("#panier-liste").addEventListener("click", (evenement) => {
     const cible = evenement.target.closest("button[data-action]");
@@ -120,7 +120,7 @@ function rafraichir() {
 function commander() {
   const message = document.querySelector("#message-commande");
   const jour = document.querySelector("#jour-livraison");
-  const moment = document.querySelector("input[name=moment]");
+  const moment = document.querySelector("input[name=moment]:checked");
   if (lignesPanier().length === 0) {
     message.textContent = "Votre panier est vide.";
     return;
@@ -133,6 +133,12 @@ function commander() {
     message.textContent = "Choisissez un jour de livraison.";
     return;
   }
+
+  if (!moment) {
+    message.textContent = "Choisissez un moment de livraison."
+    return;
+  } 
+
   const libelleJour = jour.options[jour.selectedIndex].textContent;
   message.textContent =
     "Merci ! Votre commande est enregistrée pour le " + libelleJour + " (" + moment.nextSibling.textContent.toLowerCase() + ").";
