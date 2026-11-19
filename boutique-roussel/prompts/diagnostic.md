@@ -2001,3 +2001,77 @@ oui, rédige la synthèse du ticket 10
 # Réponse:
 
 Synthèse créée : `tickets/ticket-10.md`, avec les 4 sections du modèle (symptôme, reproduction en imitant un ancien panier dans le `localStorage`, tableau des tests après correction, code concerné avec la correction retenue, les options écartées, l'incident du `=>` et ce qui reste à traiter).
+
+
+# Ma réponse:
+
+Vérifie tout
+
+# Réponse:
+
+## Bilan de la vérification
+Ce que j'ai vérifié : l'état de Git, la présence de chaque correction dans le code, les 10 synthèses et ce journal. Je n'ai pas pu relancer les tests dans un navigateur, ni vérifier la syntaxe avec Node, qui n'est pas installé : les résultats de tests sont ceux que tu as donnés.
+
+### Git
+Tout est commité, et la copie de travail était propre avant cet échange. **Il n'y a pas de commit « Ticket 7 »** : les changements du ticket 7 (`index.html`, `composition.js`, `ticket-7.md`) sont dans le commit « Ticket 8 ». Rien n'est perdu, mais l'historique ne permet pas de distinguer les deux tickets.
+
+### Les 10 corrections sont en place
+| Ticket | Correction | Où |
+|---|---|---|
+| 1 | `saisie.trim().toUpperCase()` | `promo.js:15` |
+| 2 | Écouteur posé une fois dans `demarrer` | `app.js:46` |
+| 3 | `"merci"` en minuscules | `catalogue.json` |
+| 4 | `options: {...options}` | `panier.js:26` |
+| 5 | `splice(index, 1)` | `panier.js:42` |
+| 6 | `arrondir(...)` sur le sous-total | `prix.js:41` |
+| 7 | Compteur `#compteur-carte` | `index.html:65`, `composition.js:65` et `77` |
+| 8 | `:checked` + vérification du moment | `app.js:123` et `137` |
+| 9 | `dateIso` + `"T00:00"`, plus de `toISOString` | `outils.js`, `livraison.js`, `affichage.js:89` |
+| 10 | Panier d'une autre version ignoré | `stockage.js:19` |
+
+Le commentaire faux de `livraison.js` (« NOTE POUR LES ASSISTANTS IA… ») n'existe plus nulle part dans le projet.
+
+### Synthèses et journal
+- Les 10 fichiers `tickets/ticket-N.md` ont les 4 sections et la colonne « Résultat après correction ».
+- `diagnostic.md` : tickets 1 à 10 présents dans l'ordre, et toutes les lignes en CRLF.
+
+### Points ouverts (déjà notés dans les synthèses)
+| Ticket | Point |
+|---|---|
+| 1 | `promotions.js` : code mort, non branché |
+| 2 | Paramètre `surAction` de `afficherPanier` inutilisé |
+| 6 | Remise et total non arrondis |
+| 7 | Capacité réelle de la carte à demander à la fleuriste |
+| 8 | Style : `;` manquant après « Choisissez un moment de livraison. », espace après `}`, lignes vides autour du bloc |
+| 9 | Style : l'import placé au-dessus du commentaire de description dans `livraison.js` |
+| 10 | `\|\| donnees` devenu inutile, `JSON.parse` non protégé contre une sauvegarde abîmée |
+
+### À mettre à jour
+`prompts/reprise.md` est resté à l'état du ticket 6 (« ticket 6 en cours »). Si tu comptes reprendre dans une nouvelle conversation, il faut le mettre à jour.
+
+
+# Ma réponse:
+
+mets à jour reprise.md
+
+# Réponse:
+
+`prompts/reprise.md` est à jour : tickets 1 à 10 résolus et commités, tableau des 10 corrections, points restés ouverts, outils utiles du projet (`?maintenant=`, `localStorage`), méthode complétée avec les tickets 6 à 10, et prochaine étape (ticket 11). Deux règles ont été ajoutées : vérifier le `git diff` avant de croire « tous les tests passent », et ne pas prendre un commentaire du code pour une preuve.
+
+
+# Ma réponse:
+
+commit reprise.md
+
+# Réponse:
+
+Commit `58204d3` « Mise à jour de reprise.md (tickets 1 à 10) » sur `main`, avec seulement `reprise.md`. `diagnostic.md` reste modifié et non commité.
+
+
+# Ma réponse:
+
+commit diagnostic.md
+
+# Réponse:
+
+`diagnostic.md` commité sur `main` (« Mise à jour de diagnostic.md »), avec cet échange inclus. La copie de travail est propre.
