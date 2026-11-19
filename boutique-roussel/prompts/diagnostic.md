@@ -341,3 +341,187 @@ J'ai renommé ticket-N.md en [ticket-1.md](boutique-roussel/tickets/ticket-1.md)
 Le modèle n'avait pas de section pour la correction, alors je l'ai mise dans CODE_CONCERNE plutôt que d'ajouter une section.
 
 Comme le fichier a été renommé, il n'y a plus de modèle vide pour le ticket 2. Je peux le recréer quand tu en auras besoin. Je n'ai rien commité.
+
+# Ticket 2:
+
+Ticket 2 : le bouton +
+Bonjour, quand une cliente veut plusieurs bouquets identiques et clique sur le +, le panier en ajoute 
+plusieurs d'un coup, et c'est de pire en pire à chaque clic. Une cliente s'est retrouvée avec une quinzaine 
+de bouquets. Heureusement qu'elle a vu le total avant de commander !
+
+# Réponse:
+
+L'indice le plus précieux du ticket est **« de pire en pire à chaque clic »**. Ce n'est pas un calcul faux, sinon l'erreur serait toujours la même. C'est quelque chose qui **s'accumule** à chaque clic.
+
+## 1. Reproduire et mesurer
+Ajoute un bouquet, puis clique sur + plusieurs fois. Note la quantité après chaque clic : 1 → ? → ? → ?
+Est-ce que ça augmente de +1, +2, +3... ou ça double ? La forme de la suite te dira ce qui s'accumule.
+
+## 2. Ce que fait le code (explication)
+- Chaque clic sur +, − ou Supprimer appelle `quandActionPanier` dans [app.js:75](boutique-roussel/js/app.js#L75). Elle change la quantité puis appelle `rafraichir()`.
+- `rafraichir()` réaffiche le panier en appelant `afficherPanier` dans [affichage.js:42](boutique-roussel/js/affichage.js#L42).
+- `afficherPanier` vide la liste (`replaceChildren()` retire les lignes **à l'intérieur** de la liste), recrée les lignes, puis, à la fin, ajoute un **écouteur de clic** (`addEventListener`) sur la liste elle-même (`#panier-liste`).
+
+Un écouteur de clic, c'est une consigne « quand on clique ici, exécute cette fonction ». Un élément peut en avoir plusieurs, et ils s'exécutent tous.
+
+## 3. Hypothèses
+1. L'écouteur est ajouté à chaque affichage, mais l'ancien n'est jamais retiré. Après N affichages, un clic déclenche N fois l'action.
+2. Le problème vient de `changerQuantite` dans panier.js, qui ajouterait plus que 1.
+
+Laquelle explique le mieux « de pire en pire » ? Laquelle donnerait au contraire une erreur constante ?
+
+## 4. Vérifier avec l'outil du navigateur (sans lire de code)
+1. `F12` → onglet **Éléments** → sélectionne la liste du panier (`<ul id="panier-liste">`).
+2. Dans le panneau de droite, ouvre l'onglet **Écouteurs d'événements** (Event Listeners) → `click`.
+3. Compte les écouteurs, clique sur +, recompte.
+
+Note tes observations dans diagnostic.md, puis dis-moi quelle hypothèse tu retiens et pourquoi. On parlera de la correction ensuite.
+
+
+# Ma réponse:
+
+l'hypothèse 1, ça double à chaque clic car ça reprend la valeur qu'il avait au lieu de juste faire +1
+
+# Réponse:
+
+Bonne hypothèse, et ton observation « ça double » est juste. En revanche, l'explication n'est pas la bonne : le code ne « reprend » pas l'ancienne valeur.
+
+## Le vrai mécanisme
+- `changerQuantite` dans [panier.js:31](boutique-roussel/js/panier.js#L31) fait bien +1 à chaque appel. Cette fonction est correcte.
+- C'est le **nombre d'appels** qui augmente. S'il y a 4 écouteurs sur la liste, un seul clic fait 4 fois « +1 puis réaffiche ».
+- Chaque réaffichage ajoute **un écouteur de plus**. Avec 4 écouteurs, un clic provoque donc 4 réaffichages, et on passe à 8 écouteurs.
+- C'est pour ça que ça double : le nombre d'écouteurs double à chaque clic, et la quantité ajoutée avec lui.
+
+Si tu ne l'as pas encore fait, vérifie-le avec l'onglet **Écouteurs d'événements** du navigateur. Voir le nombre d'écouteurs grandir est la preuve qui te permet de confirmer l'hypothèse, au lieu de la supposer.
+
+## Les options de correction
+Le problème : l'écouteur est ajouté **à chaque affichage**, alors qu'il n'en faudrait **qu'un seul**.
+
+| | Option | Ce qu'on change | Remarque |
+|---|---|---|---|
+| (a) | Ajouter l'écouteur sur la liste **une seule fois**, au démarrage de l'appli | Sortir l'`addEventListener` de `afficherPanier` | La liste n'est jamais recréée, donc un seul écouteur suffit pour toujours |
+| (b) | Mettre l'écouteur **sur chaque bouton**, comme pour le bouton « Composer » ([affichage.js:25](boutique-roussel/js/affichage.js#L25)) | Modifier la fonction `bouton` | Les boutons sont recréés à chaque affichage, donc les anciens écouteurs disparaissent avec eux |
+| (c) | Retirer l'ancien écouteur avant d'en ajouter un nouveau | Garder une référence vers l'ancien écouteur | Fonctionne, mais ajoute de la complexité |
+
+Avec le même critère qu'au ticket 1 (régler le problème en cassant le moins de choses possible), laquelle choisis-tu, et pourquoi ?
+
+Indice pour comparer : regarde **combien de fois** `afficherPanier` est appelée et **ce qu'elle reçoit** en paramètre (`surAction`). Est-ce que ça change d'un appel à l'autre ?
+
+
+# Ma réponse:
+
+je choisis (a), sortir l'écouteur de afficherPanier
+
+# Réponse:
+
+Bon choix : la liste `#panier-liste` existe dès le chargement de la page et n'est jamais recréée, donc un seul écouteur posé au démarrage suffit.
+
+## Où le mettre
+Dans [app.js](boutique-roussel/js/app.js), la fonction `demarrer()` s'exécute **une seule fois**, au chargement. Elle pose déjà les écouteurs du formulaire promo, du code postal et du bouton Commander ([app.js:38-43](boutique-roussel/js/app.js#L38-L43)). C'est le bon endroit pour celui du panier.
+
+## Les étapes
+1. Dans [affichage.js:67-72](boutique-roussel/js/affichage.js#L67-L72), **coupe** le bloc qui commence par le commentaire « Les boutons + , − et Supprimer » et finit par `});`. Garde bien l'accolade `}` qui ferme `afficherPanier`.
+2. **Colle** ce bloc dans `demarrer()` d'app.js, à la suite des autres `addEventListener` (après la ligne du bouton Commander).
+3. Adapte deux noms, car ils n'existent pas dans app.js :
+   - `liste` était une variable locale d'`afficherPanier`. Dans app.js, remplace-la par la façon dont les autres lignes trouvent leurs éléments : `document.querySelector("#panier-liste")`.
+   - `surAction` était le paramètre d'`afficherPanier`. Dans app.js, la fonction réelle s'appelle `quandActionPanier`.
+
+Le paramètre `surAction` d'`afficherPanier` ne servira plus. Tu peux le laisser pour l'instant : il ne gêne pas, et on peut le noter comme nettoyage à faire.
+
+## Les tests après
+| Action | Attendu |
+|---|---|
+| Ajouter un bouquet, cliquer 5 fois sur + | quantité 1 → 2 → 3 → 4 → 5 → 6 |
+| Cliquer sur − | −1 à chaque clic ; à 0, la ligne disparaît |
+| Supprimer | une seule ligne supprimée, pas plusieurs |
+| Deux bouquets différents, + sur le 2e | seul le 2e change |
+| Recharger la page puis cliquer sur + | toujours +1 |
+| Onglet Écouteurs d'événements sur `#panier-liste` | un seul écouteur `click`, même après plusieurs clics |
+
+Si l'affichage casse, ouvre la console (`F12`) comme au ticket 1, et colle-moi l'erreur.
+
+
+# Ma réponse:
+
+j'ai tout cassé j'ai surement fais des fautes de frape au niveau de la fonction
+
+# Réponse:
+
+Tu as mis le code au bon endroit, il y a juste deux soucis.
+
+## 1. Trop de texte remplacé dans la première ligne
+Dans le bloc d'origine, la première ligne était :
+
+```js
+liste.addEventListener("click", (evenement) => {
+```
+
+Il fallait remplacer **seulement le mot `liste`**. Toi, tu as aussi effacé `.addEventListener("click", (evenement) => {`. Sans ce morceau :
+- le navigateur ne sait plus que c'est un écouteur de clic ;
+- `evenement` n'existe plus.
+
+Rajoute ce qui manque juste après `document.querySelector("#panier-liste")`.
+
+La dernière ligne du bloc d'origine était `});` et la tienne est `};`. Remets la parenthèse qui manque.
+
+## 2. Le bloc est toujours dans affichage.js
+D'après le diff, [affichage.js](boutique-roussel/js/affichage.js#L67-L72) n'a pas changé. Tu as copié le bloc au lieu de le couper. Même une fois app.js réparé, le bug du ticket resterait. Supprime le bloc dans affichage.js en gardant l'accolade `}` qui ferme `afficherPanier`.
+
+## Le réflexe
+Ouvre la console avec `F12` : elle doit montrer une erreur de syntaxe (`SyntaxError`) dans app.js avec le numéro de ligne. Une seule erreur de syntaxe empêche le fichier entier de se charger, et c'est pour ça que toute la page est cassée.
+
+Pour comparer ce que tu as modifié avec l'original, utilise l'onglet **Contrôle de source** de VS Code (`Ctrl+Shift+G`) et clique sur le fichier. C'est ce que j'ai regardé pour trouver ces deux erreurs.
+
+
+# Ma réponse:
+
+fais le pour moi
+
+# Réponse:
+
+C'est corrigé dans [app.js:44-49](boutique-roussel/js/app.js#L44-L49) :
+- j'ai remis `.addEventListener("click", (evenement) => {` après `document.querySelector("#panier-liste")` ;
+- j'ai remplacé `};` par `});` à la fin du bloc ;
+- j'ai réaligné le commentaire et précisé que l'écouteur est posé une seule fois.
+
+Tu avais déjà retiré le bloc d'[affichage.js](boutique-roussel/js/affichage.js), donc il n'y a plus qu'un seul écouteur sur le panier. Je n'ai pas pu lancer de vérification automatique (Node n'est pas installé) : c'est ton test dans le navigateur qui confirmera.
+
+Recharge la page avec `Ctrl+F5` et refais les tests du tableau, en particulier : 5 clics sur + doivent donner 1 → 6, et l'onglet Écouteurs d'événements ne doit montrer qu'un seul écouteur `click` sur `#panier-liste`.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+Bravo, le ticket 2 est résolu.
+
+## Récapitulatif pour le ticket
+- **Symptôme** : chaque clic sur + ajoutait de plus en plus de bouquets (la quantité doublait).
+- **Cause** : `afficherPanier` ajoutait un écouteur de clic sur `#panier-liste` à chaque affichage, sans retirer l'ancien. Chaque clic déclenchait donc tous les écouteurs accumulés, et chacun en ajoutait un nouveau en réaffichant le panier.
+- **Correction** : option (a). L'écouteur est posé une seule fois dans `demarrer()` (app.js) et retiré d'`afficherPanier` (affichage.js).
+- **Tests** : tous OK, y compris un seul écouteur visible dans l'onglet Écouteurs d'événements.
+- **Incident** : une ligne mal recopiée a cassé la page (erreur de syntaxe), retrouvée grâce au diff de VS Code.
+- **Reste à traiter** : le paramètre `surAction` d'`afficherPanier` ne sert plus.
+
+## Ce que ce ticket ajoute à ta méthode
+- Lire le symptôme comme un indice : « de pire en pire » signifie que quelque chose s'accumule.
+- Mesurer avant de supposer : noter la suite des quantités.
+- Prouver avec les outils du navigateur : l'onglet Écouteurs d'événements montre la cause sans lire le code.
+
+Veux-tu que je synthétise le ticket 2 dans tickets/ticket-2.md avec la même structure que le ticket 1 ?
+
+
+# Ma réponse:
+
+oui, synthétise le ticket 2 dans ticket-2.md
+
+# Réponse:
+
+J'ai créé [ticket-2.md](boutique-roussel/tickets/ticket-2.md) avec les mêmes 4 sections que le ticket 1 :
+
+- **SYMPTOME** : les bouquets ajoutés en trop à chaque clic sur « + ».
+- **ETAPES** : comment reproduire le bug, et comment confirmer la cause avec l'onglet Écouteurs d'événements.
+- **ATTENDU** : le tableau des tests, tous OK après correction.
+- **CODE_CONCERNE** : les trois fichiers impliqués, le mécanisme du doublement, la correction retenue et les options écartées, l'erreur de syntaxe pendant la correction, et le paramètre `surAction` devenu inutile.

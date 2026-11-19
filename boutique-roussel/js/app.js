@@ -41,6 +41,13 @@ async function demarrer() {
     rafraichir();
   });
   document.querySelector("#bouton-commander").addEventListener("click", commander);
+  
+  // Les boutons + , − et Supprimer de toutes les lignes (écouteur posé une seule fois).
+  document.querySelector("#panier-liste").addEventListener("click", (evenement) => {
+    const cible = evenement.target.closest("button[data-action]");
+    if (!cible) return;
+    quandActionPanier(cible.dataset.action, Number(cible.dataset.index));
+  });
 
   rafraichir();
 }
