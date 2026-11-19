@@ -1,3 +1,5 @@
+import { arrondir } from "./outils.js";
+
 // Calcul des prix : bouquet, options, sous-total et total de la commande.
 
 let catalogue = null;
@@ -36,7 +38,7 @@ export function prixLigne(ligne) {
 
 // Sous-total du panier, avant remise et livraison.
 export function sousTotal(lignes) {
-  return lignes.reduce((total, ligne) => total + prixLigne(ligne), 0);
+  return arrondir(lignes.reduce((total, ligne) => total + prixLigne(ligne), 0));
 }
 
 // Total à payer : sous-total, moins la remise, plus la livraison.

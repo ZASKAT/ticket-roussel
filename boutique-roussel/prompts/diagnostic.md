@@ -885,3 +885,260 @@ J'ai créé [ticket-5.md](boutique-roussel/tickets/ticket-5.md) avec les mêmes 
 - **ETAPES** : la reproduction, et un tableau des essais par position (premier, milieu, dernier, bouton −) qui fait apparaître la règle.
 - **ATTENDU** : le tableau des tests, tous OK après la correction.
 - **CODE_CONCERNE** : `supprimerLigne` et `changerQuantite` dans panier.js, la correction `splice(index, 1)` et la vérification dans la documentation.
+
+
+# Ticket 6:
+
+Ticket 6 : la livraison facturée à 60 €
+Bonjour, sur le site il est écrit que la livraison est offerte dès 60 € d'achat. Une cliente de Tours a 
+commandé un Blanc pur en taille moyenne, avec le vase. Son sous-total affichait bien 60,00 €, mais on 
+lui a compté 5,90 € de livraison. Je l'ai remboursée, mais cela ne doit pas se reproduire.
+
+# Réponse:
+
+Le ticket donne des chiffres précis : on peut **refaire le calcul** à la main et dans le navigateur.
+
+## 1. Refaire le calcul de la cliente
+Les prix sont dans [catalogue.json](boutique-roussel/data/catalogue.json) :
+- Blanc pur : 38,90 € ;
+- supplément taille moyenne : 8,20 € ;
+- vase : 12,90 €.
+
+Fais la somme à la main : tu obtiens bien 60,00 €, et la livraison devrait donc être offerte.
+
+## 2. Ce que fait le code
+- `prixUnitaire` ([prix.js:21](boutique-roussel/js/prix.js#L21)) additionne le prix du bouquet, le supplément de taille, le vase et la carte.
+- `fraisLivraison` ([livraison.js:24](boutique-roussel/js/livraison.js#L24)) offre la livraison si `montant >= regles.seuilGratuite`. Le seuil est 60 dans [livraison.json](boutique-roussel/data/livraison.json).
+- `formaterPrix` ([outils.js:4](boutique-roussel/js/outils.js#L4)) affiche le montant **arrondi à 2 décimales**. Ce qui est affiché n'est donc pas forcément la valeur exacte utilisée dans les calculs.
+
+## 3. Hypothèses
+1. La comparaison est stricte (`>` au lieu de `>=`), donc exactement 60 € ne suffit pas.
+2. Le seuil dans les données n'est pas 60.
+3. Le montant comparé n'est pas le même que le sous-total affiché, par exemple parce qu'on a déjà retiré une remise.
+4. Le montant calculé n'est pas **exactement** 60, même si l'affichage montre 60,00 €.
+
+Relis les lignes citées : tu peux en éliminer deux rapidement, juste en lisant.
+
+## 4. Vérifier dans la console
+Ouvre la console avec `F12` et tape exactement :
+
+```js
+38.9 + 8.2 + 12.9
+```
+
+Puis :
+
+```js
+38.9 + 8.2 + 12.9 >= 60
+```
+
+Compare ce que tu vois avec tes hypothèses. Si le résultat te surprend, demande à une IA ou cherche « JavaScript 0.1 + 0.2 » pour comprendre pourquoi.
+
+Note tes observations dans diagnostic.md, puis donne-moi ta conclusion.
+
+
+# Ma réponse:
+
+synthetise la conversation en prompt pour l'ouvrir dans une autre conversation
+
+# Réponse:
+
+J'ai créé [reprise.md](boutique-roussel/prompts/reprise.md). Pour reprendre dans une nouvelle conversation, colle son contenu en premier message. Il contient :
+- le contexte de l'exercice et les règles (pas de PDF, pas de réponse directe, pas de cours de JavaScript) ;
+- la consigne du journal diagnostic.md et le modèle des synthèses ticket-N.md ;
+- un tableau des tickets 1 à 5 résolus ;
+- l'état du ticket 6 : ce qui t'a déjà été donné et la prochaine étape ;
+- la méthode que tu as apprise au fil des tickets.
+
+
+# Ma réponse:
+
+lis reprise.md
+
+# Réponse:
+
+Reprise lue. Ticket 6 en cours : tu devais taper `38.9 + 8.2 + 12.9` puis `38.9 + 8.2 + 12.9 >= 60` dans la console. Donne-moi tes observations et ta conclusion.
+
+
+# Ma réponse:
+
+59.99999999999999999999 le résultat n'atteint jamais 60
+
+# Réponse:
+
+## Ton observation
+Bonne conclusion : c'est l'**hypothèse 4**.
+
+Petite précision : la console affiche `59.99999999999999`. Ce n'est pas une suite infinie de 9, c'est un nombre fini, très proche de 60 mais plus petit.
+
+**Pourquoi** : JavaScript stocke les nombres en binaire. `38.9`, `8.2` et `12.9` ne s'y écrivent pas exactement, un peu comme 1/3 = 0,333… en décimal. Les petites erreurs s'additionnent.
+- `formaterPrix` arrondit à l'affichage : la cliente voit 60,00 €.
+- `fraisLivraison` compare la valeur brute : `59.99999999999999 >= 60` donne `false`, donc 5,90 € de livraison.
+
+## Les autres hypothèses sont éliminées
+1. La comparaison est bien `>=` ([livraison.js:27](../js/livraison.js#L27)).
+2. Le seuil vaut bien 60 ([livraison.json:2](../data/livraison.json#L2)).
+3. [app.js:114](../js/app.js#L114) passe à `fraisLivraison` le même `montant` que celui affiché.
+
+À noter : [outils.js:21](../js/outils.js#L21) contient déjà une fonction `arrondir(montant)` (arrondi au centime), qui n'est utilisée nulle part.
+
+## Options de correction
+| # | Où | Modification | Avantages | Risques |
+|---|---|---|---|---|
+| A | `app.js:114` | `fraisLivraison(etat.codePostal, arrondir(montant))` | 1 ligne, réutilise `arrondir` | Corrige seulement cet appel. Les autres calculs (promo, total) gardent le montant imprécis. |
+| B | `livraison.js:27` | `if (arrondir(montant) >= regles.seuilGratuite)` | Corrige là où la comparaison est faite, pour tous les appels | Ne protège que la livraison. Il faut ajouter un `import` dans `livraison.js`. |
+| C | `prix.js`, `sousTotal` | Arrondir le résultat du `reduce` avec `arrondir(...)` | Corrige à la source : livraison, promo et total reçoivent un montant juste | Touche le calcul central, utilisé partout. Les valeurs changent de moins d'un centime. |
+| D | Partout | Calculer en centimes (nombres entiers) | Solution la plus solide | Grosse modification : données, calculs et affichage |
+| E | `livraison.js:27` | `montant >= seuil - 0.005` | Aucun import | Bricolage, nombre « magique » peu lisible |
+
+Critère : régler le problème en cassant le moins de choses possible. Quelle option choisis-tu ?
+
+Pour tester ensuite : le cas du ticket (Blanc pur, moyenne, vase, Tours), un panier juste sous 60 € et un panier au-dessus.
+
+
+# Ma réponse:
+
+option C
+
+# Réponse:
+
+## Option C : arrondir le sous-total à la source
+Deux modifications, toutes les deux dans `js/prix.js`.
+
+### 1. Importer `arrondir`
+`prix.js` n'importe rien pour l'instant. Ajoute une ligne `import` tout en haut du fichier, sur le modèle de celles de `app.js`. `arrondir` est exportée par `./outils.js`.
+
+### 2. Arrondir le résultat de `sousTotal`
+Aujourd'hui, la fonction renvoie directement le résultat du `reduce` :
+```js
+return lignes.reduce((total, ligne) => total + prixLigne(ligne), 0);
+```
+Le `reduce` additionne les lignes une par une et renvoie la somme. Il faut passer cette somme entière à `arrondir(...)` avant de la renvoyer.
+
+Attention : arrondis le résultat final, pas l'intérieur du `reduce`.
+
+## Ensuite
+1. Recharge la page (`F5`) et regarde la console (`F12`) : aucune erreur ne doit apparaître.
+2. Teste :
+   - le cas du ticket : Blanc pur, taille moyenne, avec vase, livré à Tours. Livraison attendue : 0,00 € ;
+   - un panier juste sous 60 €. Livraison attendue : payante ;
+   - un panier au-dessus de 60 €. Livraison attendue : 0,00 € ;
+   - un code promo (NOEL10), pour vérifier que la remise est toujours juste.
+
+Dis-moi quand c'est fait, ou si tu bloques.
+
+
+# Ma réponse:
+
+j'ai cassé la page
+
+# Réponse:
+
+Pas de panique. J'ai regardé ton `git diff` : il y a deux points à revoir. Applique la méthode habituelle.
+
+## 1. La ligne `import` (c'est elle qui casse la page)
+Ouvre la console (`F12`) : tu dois voir une erreur de chargement, avec l'adresse du fichier demandé.
+
+Compare ton import avec ceux de `app.js` ligne 7, caractère par caractère. Le navigateur ne devine pas l'extension d'un fichier : il demande exactement le chemin écrit.
+
+## 2. La ligne `sousTotal` (elle posera problème une fois l'import réparé)
+Compare avec la version d'origine :
+```js
+// avant
+return lignes.reduce((total, ligne) => total + prixLigne(ligne), 0);
+// toi
+return lignes.reduce((total, ligne) => arrondir(total + prixLigne(ligne), 0));
+```
+- **Le `0` a changé de place.** À l'origine, c'est le 2e argument de `reduce` : la valeur de départ du total. Chez toi, il est devenu un 2e argument de `arrondir`, qui l'ignore. Sans valeur de départ, `reduce` prend la première ligne du panier (un objet) comme total, et le calcul devient faux.
+- **`arrondir` est à l'intérieur du `reduce`.** Il s'applique alors à chaque étape de l'addition, au lieu de s'appliquer une seule fois au résultat final.
+
+Le principe : garde la ligne d'origine intacte et entoure tout le `lignes.reduce(...)` par `arrondir( ... )`.
+
+Recharge, vérifie la console, puis refais les 4 tests.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+J'ai vérifié avec `git diff` : l'`import` est corrigé (`"./outils.js"`), mais **la ligne `sousTotal` n'a pas changé** sur le disque :
+```js
+return lignes.reduce((total, ligne) => arrondir(total + prixLigne(ligne), 0));
+```
+Avec ce code, les tests ne devraient pas tous passer :
+- **panier vide** : `reduce` sans valeur de départ sur une liste vide provoque une erreur (`TypeError`) ;
+- **1 bouquet** : `reduce` renvoie la ligne elle-même (un objet) au lieu d'un prix ;
+- **2 bouquets ou plus** : le sous-total devient `NaN`.
+
+Deux explications possibles :
+1. Ta correction n'est pas enregistrée. Un point blanc sur l'onglet `prix.js` dans VS Code signale un fichier modifié non enregistré : fais `Ctrl+S`.
+2. Le navigateur utilise une ancienne version du fichier. Recharge sans cache avec `Ctrl+F5`.
+
+Ensuite, refais les tests en ajoutant le **panier vide** et un **panier de 2 bouquets**, avec la console ouverte. Redis-moi quand c'est bon, et je revérifierai le diff.
+
+
+# Ma réponse:
+
+corrige le
+
+# Réponse:
+
+Corrigé dans `js/prix.js`, fonction `sousTotal` :
+```js
+// avant
+return lignes.reduce((total, ligne) => arrondir(total + prixLigne(ligne), 0));
+// après
+return arrondir(lignes.reduce((total, ligne) => total + prixLigne(ligne), 0));
+```
+- Le `0` est revenu en 2e argument de `reduce` : c'est la valeur de départ du total.
+- `arrondir(...)` entoure tout le `reduce` : il s'applique une seule fois, sur la somme finale.
+
+Recharge avec `Ctrl+F5`, puis refais les tests avec la console ouverte :
+- le cas du ticket : Blanc pur, taille moyenne, avec vase, livré à Tours ;
+- un panier juste sous 60 € ;
+- un panier au-dessus de 60 € ;
+- le code NOEL10 ;
+- un panier vide ;
+- un panier de 2 bouquets.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+J'ai vérifié avec `git diff` : seul `js/prix.js` a changé, comme prévu.
+```js
+import { arrondir } from "./outils.js";
+...
+return arrondir(lignes.reduce((total, ligne) => total + prixLigne(ligne), 0));
+```
+
+## Récapitulatif du ticket 6
+| | |
+|---|---|
+| **Symptôme** | Sous-total affiché 60,00 €, mais 5,90 € de livraison facturés |
+| **Cause** | Calcul en nombres décimaux : 38,90 + 8,20 + 12,90 donne `59.99999999999999`. L'affichage arrondit à 60,00 €, mais `fraisLivraison` compare la valeur brute, et `>= 60` donne `false`. |
+| **Hypothèses écartées** | Comparaison stricte (c'est bien `>=`), seuil différent (il vaut bien 60), montant différent de celui affiché |
+| **Correction (option C)** | `sousTotal` arrondit son résultat au centime avec `arrondir` (`outils.js`), qui existait déjà mais n'était utilisée nulle part |
+| **Incidents** | 1. Import sans `.js` : le fichier n'était pas trouvé et la page était cassée. 2. `arrondir` placé dans le `reduce` avec le `0` déplacé. Cette ligne a été corrigée par l'IA à ta demande. |
+| **Reste à traiter** | Seul le sous-total est arrondi. La remise (`promo.js`) et le total (`totalCommande`) sont calculés à partir de nombres décimaux et peuvent encore contenir de petites imprécisions. L'affichage les masque, mais elles comptent si ces valeurs sont comparées un jour. |
+
+## Méthode retenue
+- Ce qui est affiché n'est pas forcément la valeur utilisée dans le calcul.
+- Tester une hypothèse directement dans la console.
+- Avant de dire « ça marche », vérifier que le fichier est enregistré et que le navigateur ne garde pas une ancienne version : `Ctrl+S`, puis `Ctrl+F5`.
+
+Veux-tu que je rédige la synthèse `tickets/ticket-6.md` ?
+
+
+# Ma réponse:
+
+oui, rédige la synthèse du ticket 6
+
+# Réponse:
+
+Synthèse créée : `tickets/ticket-6.md`, avec les 4 sections du modèle (symptôme, étapes de reproduction avec la vérification dans la console, tableau des tests après correction, code concerné avec la correction retenue, les options écartées, les deux incidents et ce qui reste à traiter).
