@@ -619,3 +619,166 @@ J'ai créé [ticket-3.md](boutique-roussel/tickets/ticket-3.md) avec les mêmes 
 - **ETAPES** : comment reproduire le bug, et pourquoi le code de tri n'est pas en cause.
 - **ATTENDU** : le tableau des tests, tous OK après la correction.
 - **CODE_CONCERNE** : la donnée erronée et les deux fichiers de code concernés, la correction faite dans les données, la raison pour laquelle on n'a pas rendu le tri tolérant, et la vérification des six bouquets.
+
+
+# Ticket 4:
+
+Ticket 4 : deux tailles, deux grands bouquets
+Bonjour, une cliente voulait offrir deux Pivoine poudrée : une petite pour sa sœur et une grande pour 
+sa mère. Elle a composé la petite et l'a ajoutée au panier, puis elle a choisi « Grand » et a cliqué à 
+nouveau sur « Ajouter au panier ». Dans son panier : deux grandes ! Elle n'a pas compris, et moi non 
+plus.
+
+# Réponse:
+
+Ce ticket est plus subtil que les précédents : il n'y a pas de faute de frappe à trouver. Commence par bien observer **à quel moment** la petite devient grande.
+
+## 1. Reproduire en observant chaque étape
+1. Ouvre « Pivoine poudrée », laisse « Petit », ajoute au panier. Regarde le panier : que contient-il ?
+2. Choisis « Grand », **sans cliquer** sur « Ajouter au panier ». Regarde de nouveau le panier (au besoin, clique sur + puis − pour le réafficher). La ligne a-t-elle changé ?
+3. Clique sur « Ajouter au panier ». Combien de **lignes** y a-t-il : deux lignes d'un bouquet, ou une ligne avec une quantité de 2 ?
+4. Recommence, mais **recharge la page** (`F5`) entre l'ajout de la petite et le choix de « Grand ». Le bug se produit-il encore ?
+
+## 2. Ce que fait le code
+- [composition.js:7](boutique-roussel/js/composition.js#L7) crée **un seul** objet `options` (taille, vase, carte, message) pour tout le formulaire de composition.
+- À chaque changement dans le formulaire, `lireFormulaire` ([composition.js:69](boutique-roussel/js/composition.js#L69)) met à jour cet objet.
+- Au clic sur « Ajouter au panier », `ajouter` ([composition.js:87](boutique-roussel/js/composition.js#L87)) envoie cet objet `options` au panier.
+- `ajouterAuPanier` ([panier.js:21](boutique-roussel/js/panier.js#L21)) cherche une ligne avec le même bouquet et les mêmes options. S'il en trouve une, il augmente sa quantité, sinon il crée une ligne qui garde ces `options`.
+
+## 3. Hypothèses
+1. Le choix de la taille n'est pas lu, et le bouquet est toujours ajouté avec la même taille.
+2. `memesOptions` ([panier.js:16](boutique-roussel/js/panier.js#L16)) compare mal deux compositions et fusionne des bouquets différents.
+3. La ligne déjà dans le panier est **modifiée après coup**, quand la cliente change la taille dans le formulaire.
+
+Pour chacune, demande-toi ce que tu devrais voir aux étapes 2, 3 et 4 si elle était vraie. Par exemple, l'hypothèse 1 donnerait deux petites, pas deux grandes.
+
+Note tes observations dans diagnostic.md, puis dis-moi quelle hypothèse tu retiens et pourquoi. Si c'est la 3, réfléchis aussi à une question : pourquoi le rechargement de la page change-t-il quelque chose ?
+
+
+# Ma réponse:
+
+hypothèse 3, la petite devient grande avant d'ajouter car il faut les considerer comme 2 objets differents
+
+# Réponse:
+
+Bonne conclusion. Ton observation de l'étape 2 (la petite devient grande **avant** le deuxième ajout) écarte les hypothèses 1 et 2, qui ne pourraient agir qu'au moment de l'ajout. Et tu as trouvé ce qu'il faudrait : **deux objets différents**. Aujourd'hui, il n'y en a qu'un.
+
+## Le mécanisme
+En JavaScript, quand on passe un objet à une fonction ou qu'on le range dans une liste, on ne fait **pas de copie**. On transmet une **référence**, c'est-à-dire l'adresse du même objet.
+
+1. Premier ajout : la ligne du panier reçoit l'objet `options` du formulaire. Ce n'est pas une copie, c'est **le même objet**.
+2. La cliente choisit « Grand » : `lireFormulaire` modifie `options.taille`. La ligne du panier pointe vers le même objet, donc elle devient « grand » elle aussi.
+3. Deuxième ajout : `ajouterAuPanier` compare la ligne existante et `options`. C'est le même objet, donc elles sont forcément identiques. Il fait +1 sur la ligne existante.
+
+Résultat : une seule ligne « Grand » avec une quantité de 2.
+
+## Pourquoi le rechargement change tout
+Au rechargement, le panier est relu depuis la sauvegarde du navigateur ([stockage.js:13](boutique-roussel/js/stockage.js#L13)). Cette sauvegarde est du **texte** (`JSON.stringify` puis `JSON.parse`), ce qui recrée des objets neufs. Le lien avec le formulaire est cassé, et le bug disparaît. C'est pour ça qu'il est difficile à reproduire si on recharge la page entre deux essais.
+
+## Les options de correction
+L'idée : ranger une **copie** des options dans le panier, pas l'objet du formulaire. En JavaScript, `{ ...options }` crée un nouvel objet avec les mêmes valeurs.
+
+| | Où faire la copie | Ce qu'on protège |
+|---|---|---|
+| (a) | Dans `ajouter`, en envoyant `{ ...options }` ([composition.js:90](boutique-roussel/js/composition.js#L90)) | Le formulaire ne prête plus son objet |
+| (b) | Dans `ajouterAuPanier`, en rangeant `{ ...options }` dans la nouvelle ligne ([panier.js:26](boutique-roussel/js/panier.js#L26)) | Le panier se protège lui-même, quel que soit l'appelant |
+
+Les deux corrigent le bug avec une seule modification. Laquelle choisis-tu, et pourquoi ? Pense à ce qui se passerait si, un jour, une autre partie du site ajoutait des bouquets au panier.
+
+
+# Ma réponse:
+
+je comprends pas le terme proteger
+
+# Réponse:
+
+Pardon, le mot n'était pas clair. Ici, « protéger » veut dire : **faire en sorte que la ligne du panier ne puisse plus être modifiée par quelqu'un d'autre que le panier**.
+
+## Une image
+Imagine que la cliente remplit une fiche de commande au crayon (le formulaire). Aujourd'hui, le panier ne fait pas de photocopie de la fiche : il garde **la fiche elle-même**. Quand la cliente gomme « Petit » pour écrire « Grand », elle modifie aussi ce que le panier avait gardé.
+
+La correction, c'est de faire une **photocopie** au moment de l'ajout. La cliente peut ensuite modifier sa fiche autant qu'elle veut, la photocopie rangée dans le panier ne bouge plus.
+
+## La vraie question : qui fait la photocopie ?
+- **(a) Le formulaire** fait la photocopie avant de la donner au panier. Ça marche, mais seulement parce que le formulaire y pense. Si un jour un autre bouton du site (par exemple « Racheter ma dernière commande ») ajoute des bouquets au panier et oublie de faire la photocopie, le bug revient.
+- **(b) Le panier** fait lui-même la photocopie de tout ce qu'on lui donne. Peu importe qui ajoute un bouquet, le panier garde toujours sa propre copie. Le bug ne peut pas revenir par un autre chemin.
+
+Avec cette image, laquelle te paraît la plus sûre ?
+
+
+# Ma réponse:
+
+je choisis (b), le panier fait la copie
+
+# Réponse:
+
+Bon choix : c'est le panier qui garde les lignes, donc c'est à lui de garantir qu'elles ne changent pas toutes seules.
+
+## Où modifier
+Ouvre [panier.js:26](boutique-roussel/js/panier.js#L26). Tu y trouves :
+
+```js
+    lignes.push({ bouquetId, options, quantite: 1 });
+```
+
+Cette ligne crée la nouvelle ligne du panier. Écrire `options` tout seul est un raccourci pour `options: options`, c'est-à-dire « range ici **le même objet** `options` ». C'est exactement ce qui crée le lien avec le formulaire.
+
+## Quoi écrire
+Remplace le mot `options` (celui entre `bouquetId,` et `, quantite`) par :
+
+```js
+options: { ...options }
+```
+
+- `options:` est le nom du champ dans la ligne du panier ;
+- `{ ...options }` est la photocopie : un nouvel objet avec les mêmes valeurs.
+
+Fais attention à bien garder les virgules autour, et l'accolade `}` puis la parenthèse `)` à la fin de la ligne.
+
+## Les tests après
+| Action | Attendu |
+|---|---|
+| Ajouter une petite Pivoine poudrée, puis choisir « Grand » sans ajouter | la ligne du panier reste « Petit » |
+| Puis cliquer sur « Ajouter au panier » | deux lignes : une petite et une grande |
+| Ajouter deux fois exactement la même composition | une seule ligne avec une quantité de 2 (non-régression) |
+| Cocher le vase après avoir ajouté un bouquet | la ligne du panier ne gagne pas de vase |
+| Recharger la page | les deux lignes sont toujours là |
+
+Si la page casse, ouvre la console avec `F12`, ou compare avec l'original dans le Contrôle de source de VS Code (`Ctrl+Shift+G`).
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+Bravo, le ticket 4 est résolu. J'ai vérifié ta ligne dans panier.js : `options: {...options}` est correct. Les espaces à l'intérieur des accolades sont facultatifs.
+
+## Récapitulatif
+- **Symptôme** : une petite puis une grande Pivoine poudrée ajoutées au panier donnaient deux grandes.
+- **Cause** : la ligne du panier gardait **le même objet** `options` que le formulaire de composition, au lieu d'une copie. Changer la taille dans le formulaire modifiait donc aussi la ligne déjà dans le panier. Au deuxième ajout, les options étaient identiques, et la quantité passait à 2.
+- **Pourquoi le bug était difficile à reproduire** : un rechargement de page recrée des objets neufs depuis la sauvegarde, ce qui casse le lien.
+- **Correction** : option (b). Le panier range une copie des options (`{ ...options }`) dans chaque nouvelle ligne ([panier.js:26](boutique-roussel/js/panier.js#L26)).
+- **Pourquoi (b)** : le panier se protège lui-même, quelle que soit la partie du site qui lui ajoute des bouquets.
+
+## Ce que ce ticket ajoute à ta méthode
+- **Observer à quel moment le bug apparaît**, pas seulement le résultat final : la petite devenait grande avant le deuxième ajout.
+- **Utiliser chaque observation pour éliminer des hypothèses**.
+- **Se demander ce qui fait disparaître le bug** : ici, le rechargement de la page était un indice sur la cause.
+
+Veux-tu que je synthétise le ticket 4 dans tickets/ticket-4.md ?
+
+
+# Ma réponse:
+
+oui, synthétise le ticket 4 dans ticket-4.md
+
+# Réponse:
+
+J'ai créé [ticket-4.md](boutique-roussel/tickets/ticket-4.md) avec les mêmes 4 sections que les tickets précédents :
+
+- **SYMPTOME** : une petite et une grande Pivoine poudrée devenues deux grandes.
+- **ETAPES** : la reproduction pas à pas, avec le moment exact où la petite devient grande, et le fait que recharger la page fait disparaître le bug.
+- **ATTENDU** : le tableau des tests, tous OK après la correction.
+- **CODE_CONCERNE** : les trois fichiers concernés, le mécanisme de l'objet partagé, la correction dans le panier et l'option écartée.
