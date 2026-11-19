@@ -141,29 +141,6 @@ je pense que (b) brancher promotions.js est pertinent, je pense qu'il faut chang
 
 # Réponse:
 
-Bonne analyse des différences entre les deux fonctions. Ton point 3, en particulier, est exactement le bon réflexe : vérifier ce que ton changement ferait casser avant de le faire.
-
-## Corrections
-- **Point 2** : `resultat.valide` ne vient pas d'une fonction « antérieure ». Dans app.js, regarde d'où vient `resultat` : quelle fonction le renvoie ? Remonte ensuite dans ce fichier pour voir où sont construits `valide` et `message`.
-- **Renommer la fonction** : explique-moi pourquoi ce serait nécessaire. Un conflit de nom n'arrive que si les deux fonctions sont importées dans **le même fichier**. Est-ce que ce serait le cas avec ton option (b) ?
-
-## Questions sur ton choix (b)
-Le choix (b) est défendable, mais regarde ce qu'il coûte :
-1. promotions.js attend un paramètre `liste`. Aujourd'hui, où vit cette liste dans l'appli ? Regarde `chargerPromos` dans promo.js. Que faudrait-il modifier dans app.js pour la lui fournir ?
-2. promotions.js renvoie `0` quand le code n'existe pas, mais aussi quand le minimum d'achat n'est pas atteint. Avec `BIENVENUE5` et un panier à 20 €, quel message la cliente verrait-elle ? Est-ce que ça régresse par rapport à aujourd'hui ?
-3. Combien de lignes et de fichiers devrais-tu toucher avec (b) ? Et avec (a) ?
-
-## Le critère à garder en tête
-Pour un ticket de maintenance, une bonne correction règle le problème signalé en **cassant le moins de choses possible**. Avec ce critère, compare de nouveau (a) et (b). Tu as le droit de garder (b), mais justifie-le.
-
-Il reste aussi un point de mon message précédent : quelle valeur est enregistrée dans `etat.codePromo` puis sauvegardée ? La saisie brute de la cliente, ou le code « propre » ? Est-ce que ça peut poser problème au rechargement de la page ?
-
-# Ma réponse:
-
-Le but de l'exercice n'est pas de me faire apprendre javascript
-
-# Réponse:
-
 Compris. Je t'expliquerai le code directement et je garde les questions pour la démarche de diagnostic. J'ai noté cette préférence dans ma mémoire du projet.
 
 ## Ce que fait le code
@@ -186,7 +163,37 @@ Tu as deux grandes options :
 | Code mort | promotions.js reste inutilisé (à signaler ou supprimer) | promo.js devient inutilisé |
 
 À toi de trancher et de noter ta justification dans diagnostic.md.
+Bon choix pour un ticket de maintenance. Je te laisse faire la modification. Voici les points d'attention et de quoi vérifier ton travail.
 
+## Pendant la modification
+- Fais le nettoyage **avant** la comparaison avec `promo.code`. Tu peux t'inspirer de la ligne de nettoyage qui existe déjà dans promotions.js.
+- appliquerPromo est appelée à **deux endroits** dans app.js :
+  - à la soumission du formulaire ;
+  - au recalcul du panier, avec le code sauvegardé.
+  
+  Si tu corriges dans promo.js, les deux cas en profitent automatiquement.
+
+## Les tests à refaire après
+| Saisie | Attendu |
+|---|---|
+| `NOEL10` | appliqué (non-régression) |
+| `noel10`, `Noel10` | appliqué |
+| `NOEL10 ` et ` NOEL10` | appliqué |
+| `N0EL10` (avec un zéro) | refusé : c'est un autre code |
+| `BIENVENUE5` avec un panier de moins de 30 € | message du minimum toujours affiché |
+
+Recharge aussi la page après avoir appliqué `noel10` : la remise doit être toujours là.
+
+Regarde enfin le message de confirmation. Doit-il afficher ce que la cliente a tapé (`noel10`), ou le vrai code (`NOEL10`) ?
+
+## Pour clôturer le ticket
+Note dans diagnostic.md :
+- la cause ;
+- la correction choisie et pourquoi ;
+- le résultat des tests ;
+- ce que tu fais de promotions.js. Il devient du code mort et doublon : le supprimer, ou le signaler sans y toucher ?
+
+Préviens-moi quand c'est fait. Je pourrai relire ta modification si tu veux.
 ## Pour la partie « utiliser une IA »
 Ce qui a fait avancer ce ticket, c'est la méthode :
 1. reproduire le bug sans téléphone ;
@@ -269,9 +276,9 @@ Si un test échoue, ou si le site ne s'affiche plus, colle-moi la ligne que tu a
 
 # Ma réponse:
 
-les affichages marchent plus
+les affichages ne marchent plus
 
-# Réponse:
+# Réponse
 
 J'ai regardé ta modification. Tu étais au bon endroit, c'est une **faute de frappe**, pas une erreur de raisonnement.
 
@@ -291,9 +298,9 @@ Corrige la lettre, recharge avec `Ctrl+F5`, puis refais les tests.
 
 # Ma réponse:
 
-ça marche, tous les tests passent
+ça marche, tous les test passent
 
-# Réponse:
+# Réponse
 
 Bravo, le ticket 1 est résolu. J'ai vérifié ta ligne dans promo.js et elle est correcte.
 
@@ -322,6 +329,8 @@ synthetise le ticket 1 dans ticket-N.md en changeant le nom en ticket-1.md et en
 
 # Réponse:
 
+Écrit pour : la personne qui va relire le ticket (formateur ou équipe), donc factuel et sans le dialogue pédagogique.
+
 J'ai renommé ticket-N.md en [ticket-1.md](boutique-roussel/tickets/ticket-1.md) avec `git mv` et j'ai gardé ses 4 sections :
 
 - **SYMPTOME** : ce que la cliente a vécu.
@@ -332,32 +341,3 @@ J'ai renommé ticket-N.md en [ticket-1.md](boutique-roussel/tickets/ticket-1.md)
 Le modèle n'avait pas de section pour la correction, alors je l'ai mise dans CODE_CONCERNE plutôt que d'ajouter une section.
 
 Comme le fichier a été renommé, il n'y a plus de modèle vide pour le ticket 2. Je peux le recréer quand tu en auras besoin. Je n'ai rien commité.
-
-# Ma réponse:
-
-maintenant, je veux que tu ecrive automatiquement dans diagnostic.md notre conversation selon le paterne que j'ai fais
-
-# Réponse:
-
-C'est fait. J'ai ajouté à la fin de diagnostic.md les échanges qui manquaient depuis « les affichages marchent plus », en suivant ton modèle « # Ma réponse: » puis « # Réponse: ».
-
-À partir de maintenant, à chaque message, j'ajouterai ton message et ma réponse à la fin du fichier. Quand tu m'envoies un nouveau ticket, je le titre « # Ticket N: », comme tu l'as fait pour le ticket 1.
-
-Je n'ai pas modifié ce que tu avais déjà écrit. Le passage autour de « je choisis (a) » contient une réponse en double et une réponse placée avant ton choix (b). Je peux le nettoyer si tu veux.
-
-
-# Ma réponse:
-
-oui remets-le en ordre
-
-# Réponse:
-
-J'ai remis le passage dans l'ordre réel de la conversation :
-
-1. ton choix (b) ;
-2. ma réponse « Bonne analyse des différences... », qui manquait ;
-3. ton message « Le but de l'exercice n'est pas de me faire apprendre javascript », qui manquait aussi ;
-4. ma réponse « Compris... », suivie de sa partie « Pour la partie utiliser une IA » qui était séparée ;
-5. ton choix (a) et ma réponse « Bon choix... ».
-
-J'ai supprimé le doublon de « Bon choix... » placé avant ton choix (a). Le reste de ton texte n'a pas changé.
