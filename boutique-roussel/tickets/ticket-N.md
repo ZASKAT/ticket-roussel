@@ -1,0 +1,7 @@
+# [SYMPTOME]    
+
+# [ETAPES]
+
+# [ATTENDU]
+
+# [CODE_CONCERNE]
