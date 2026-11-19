@@ -1798,3 +1798,206 @@ oui, rédige la synthèse du ticket 9
 # Réponse:
 
 Synthèse créée : `tickets/ticket-9.md`, avec les 4 sections du modèle (symptôme, étapes de reproduction avec la date simulée et les vérifications dans la console, tableau des tests après correction, code concerné avec la cause, la fausse piste du commentaire, la correction retenue, les options écartées, l'incident du `padStart` et ce qui reste à traiter).
+
+
+# Ticket 10:
+
+Ticket 10 : « NaN € » dans le panier
+Bonjour, une cliente fidèle, qui commandait déjà sur le site l’an dernier, avant la nouvelle version, m’a 
+envoyé une capture d’écran : son panier affiche « NaN € » à la place des prix, et elle ne peut plus 
+commander. Chez moi et chez mes autres clientes, tout fonctionne. Que se passe-t-il ?
+
+# Réponse:
+
+## Les indices du ticket
+- **Une seule** cliente est touchée, et c'est une cliente qui venait **avant la nouvelle version**.
+- Chez tout le monde ailleurs, ça fonctionne : le code et le catalogue marchent pour un panier « normal ».
+- `NaN` veut dire *Not a Number* : un calcul a reçu quelque chose qui n'est pas un nombre.
+
+Comme au ticket 1 : on n'a pas le navigateur de la cliente, il faudra **imiter** ce qu'il contient.
+
+## 1. Où le site garde-t-il le panier ?
+Le panier est retrouvé d'une visite à l'autre. Cherche dans `js/` comment : regarde `js/stockage.js`.
+- `localStorage` est une petite mémoire du navigateur, propre à chaque site **et à chaque navigateur**. Elle survit à la fermeture de la page.
+- Ouvre `F12` → onglet **Application** (Chrome) ou **Stockage** (Firefox) → **Local Storage** → ton site. Regarde la clé `panier-roussel` avec un ou deux bouquets dans le panier.
+- Dans la console, tu peux aussi l'afficher :
+```js
+JSON.parse(localStorage.getItem("panier-roussel"))
+```
+Note le format : quelles propriétés, quels noms, quel champ `version` ?
+
+## 2. Hypothèses
+1. Le navigateur de la cliente contient un panier enregistré par **l'ancienne version**, dans un format différent de celui qu'attend le nouveau code.
+2. Son panier contient un bouquet qui **n'existe plus** dans le catalogue.
+3. Son **navigateur** est trop ancien et ne comprend pas une partie du code.
+4. Le **catalogue** contient une erreur sur un prix.
+
+Certaines hypothèses s'éliminent rien qu'avec les indices du ticket. Lesquelles, et pourquoi ?
+
+## 3. Comment vérifier
+- **Relis `chargerPanier`** (`js/stockage.js`) : la constante `VERSION`, et l'expression `donnees.lignes || donnees`. `a || b` donne `a` s'il existe, sinon `b`. Pourquoi le code prévoit-il que `donnees` puisse **être directement** la liste des lignes ? Qu'est-ce que ça suggère sur le format de la version 1 ?
+- **Quels calculs donnent `NaN` ?** Dans la console, essaie par exemple :
+```js
+38.9 * 2
+38.9 * undefined
+38.9 + undefined
+```
+Puis regarde dans `js/prix.js` quelles propriétés d'une ligne (`ligne.xxx`) sont utilisées dans les calculs.
+- **Imiter un ancien panier** : tu peux écrire dans `localStorage` depuis la console, puis recharger la page :
+```js
+localStorage.setItem("panier-roussel", JSON.stringify( ... ))
+```
+Remplace `...` par un panier de ton invention, en faisant varier le format (avec ou sans `version`, propriétés absentes ou nommées autrement, bouquet inconnu…). Pour hypothèse 2, compare : un bouquet inconnu donne-t-il `NaN`, ou autre chose ?
+
+Pour revenir à un panier propre :
+```js
+localStorage.removeItem("panier-roussel")
+```
+
+Note tes observations et donne-moi ta conclusion.
+
+
+# Ma réponse:
+
+le panier de l'ancienne version donne NaN
+
+# Réponse:
+
+Bien : tu as **reproduit** le bug en imitant un ancien panier. C'est l'**hypothèse 1**. Pour choisir une correction, il faut maintenant savoir **exactement ce qui** produit le `NaN`.
+
+## Précise ton observation
+1. **Quel panier as-tu écrit** dans `localStorage` ? Colle-moi la commande `setItem` que tu as utilisée.
+2. **Quelle différence** avec le format actuel le rend incompatible ? Fais varier une chose à la fois :
+   - un panier au format actuel mais **sans** `version` et sans `{ lignes: ... }` (juste la liste `[ ... ]`) : `NaN` ou pas ?
+   - une ligne dont **une propriété manque** ou porte un autre nom (`quantite`, `bouquetId`, `options`) : laquelle provoque le `NaN` ?
+3. **Hypothèse 2** : un bouquet inconnu (`bouquetId: "tulipes"`) donne-t-il `NaN`, ou un autre prix ? Regarde ce que fait `prixUnitaire` quand `trouverBouquet` ne trouve rien.
+
+## Relier au code
+Dans `js/prix.js`, `prixLigne` calcule `prixUnitaire(ligne) * ligne.quantite`. Avec ce que tu as testé dans la console (`38.9 * undefined`), quelle propriété absente suffit à donner `NaN` ?
+
+Et pourquoi la cliente **ne peut plus commander** ? Est-ce que le `NaN` empêche la commande, ou est-ce autre chose ? Essaie de commander avec ton faux ancien panier, console ouverte.
+
+
+# Ma réponse:
+
+sans quantite ça donne NaN
+
+# Réponse:
+
+Exact. `prixLigne` calcule `prixUnitaire(ligne) * ligne.quantite`. Sans `quantite`, on obtient `38.9 * undefined`, donc `NaN`. Le `NaN` se propage ensuite au sous-total, à la livraison et au total.
+
+## Ce qu'on sait
+- **Cause** : `chargerPanier` (`js/stockage.js`) relit le panier tel quel, sans vérifier son format ni sa `version`. Un panier de l'ancienne version (une simple liste `[...]`, sans `version` ni `quantite`) passe directement aux calculs.
+- **Hypothèse 2** : un bouquet inconnu donne un prix de 0 (`bouquet ? bouquet.prix : 0`), pas `NaN`. Elle est éliminée.
+- **Hypothèses 3 et 4** : éliminées par le ticket, puisque tout fonctionne chez les autres clientes, avec le même catalogue.
+- **Effet secondaire** : sur une ligne sans `quantite`, le bouton « + » calcule `undefined + 1`, ce qui donne encore `NaN`. Le bouton « − » ne fait jamais tomber la quantité à 0. Seul « Supprimer » fonctionne.
+
+**Limite** : on ne connaît pas le **vrai** format de l'ancienne version. On sait seulement, d'après `donnees.lignes || donnees`, que c'était une liste. Tu as imité un format plausible.
+
+## Options de correction
+| # | Où | Modification | Avantages | Risques |
+|---|---|---|---|---|
+| A | `stockage.js`, `chargerPanier` | Si la `version` enregistrée n'est pas `VERSION`, ignorer la sauvegarde et repartir d'un panier vide | Simple, sûr, et utilise le champ `version` prévu pour ça. Fonctionne quel que soit l'ancien format. | La cliente perd son ancien panier. Il date de l'an dernier, donc la perte est faible. |
+| B | `stockage.js`, `chargerPanier` | **Convertir** l'ancien panier : compléter chaque ligne avec `quantite: 1` si elle manque | La cliente garde son panier | On devine le format réel : si l'ancien format a d'autres différences (options, noms de propriétés), d'autres bugs apparaîtront. |
+| C | `prix.js`, `prixLigne` | Remplacer `ligne.quantite` par `(ligne.quantite \|\| 1)` | Une seule ligne | Cache le problème au lieu de le traiter : l'affichage montre toujours « undefined » en quantité, et les boutons + et − restent cassés. |
+| D | `stockage.js` | Option A, et vérifier aussi que `lignes` est une liste : ignorer toute sauvegarde illisible ou mal formée (un `JSON.parse` qui échoue, par exemple) | Protège aussi contre d'autres données abîmées | Un peu plus de code |
+
+Dans tous les cas, la cliente peut être dépannée tout de suite, sans attendre la correction : en vidant les données du site dans son navigateur.
+
+Critère : régler le problème en cassant le moins de choses possible. Quelle option choisis-tu ?
+
+
+# Ma réponse:
+
+a
+
+# Réponse:
+
+## Option A : ignorer une sauvegarde d'une autre version
+Une seule modification, dans `js/stockage.js`, fonction `chargerPanier`.
+
+### Ce que fait la fonction aujourd'hui
+```js
+const brut = localStorage.getItem(CLE);       // lit le texte enregistré
+if (!brut) {                                  // rien d'enregistré :
+  return { lignes: [], codePromo: "" };       //   panier vide
+}
+const donnees = JSON.parse(brut);             // transforme le texte en objet
+return { lignes: donnees.lignes || donnees, codePromo: donnees.codePromo || "" };
+```
+
+### À ajouter
+Entre la ligne `const donnees = JSON.parse(brut);` et le `return` final, ajoute un bloc `if` sur le modèle de celui du dessus :
+- **condition** : `donnees.version` est différente de `VERSION`. En JavaScript, « différent de » s'écrit `!==` ;
+- **dans le bloc** : renvoyer le même panier vide que dans le premier `if`.
+
+Pourquoi ça couvre l'ancien format : un ancien panier est une simple liste `[...]`. Une liste n'a pas de propriété `version`, donc `donnees.version` vaut `undefined`, qui est bien différent de `2`.
+
+Tu n'as pas besoin de supprimer l'ancienne sauvegarde toi-même : au premier affichage, `rafraichir` (dans `app.js`) appelle `sauverPanier`, qui remplace l'ancienne sauvegarde par le nouveau format.
+
+## Tests
+Recharge avec `Ctrl+F5` et garde la console ouverte.
+
+| Cas | Comment | Attendu |
+|---|---|---|
+| Ancien panier (liste sans `version`) | ton `setItem` de tout à l'heure, puis recharger | panier vide, plus de `NaN` |
+| Panier avec `version: 1` | `setItem` avec `{ version: 1, lignes: [...] }`, puis recharger | panier vide |
+| Panier actuel | ajouter 2 bouquets, puis recharger | les 2 bouquets sont toujours là (non-régression) |
+| Aucune sauvegarde | `localStorage.removeItem("panier-roussel")`, puis recharger | panier vide, aucune erreur |
+| Après l'ancien panier | ajouter un bouquet, recharger, puis commander | le bouquet est conservé, et la commande est confirmée |
+| Format enregistré | `JSON.parse(localStorage.getItem("panier-roussel"))` | contient `version: 2` |
+
+
+# Ma réponse:
+
+corrige le
+
+# Réponse:
+
+Ta condition était juste (`donnees.version !== VERSION`). Il manquait le bloc entre accolades : `=>` sert à écrire une fonction fléchée, pas un `if`, et cette ligne cassait la page. Corrigé dans `js/stockage.js` :
+```js
+// avant
+if (donnees.version !== VERSION) =>
+// après
+if (donnees.version !== VERSION) {
+  return { lignes: [], codePromo: "" };
+}
+```
+Recharge avec `Ctrl+F5` et refais les 6 tests, console ouverte.
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+J'ai vérifié avec `git diff` : seul `js/stockage.js` a changé, avec 3 lignes ajoutées dans `chargerPanier`. C'est conforme à l'option A.
+
+## Récapitulatif du ticket 10
+| | |
+|---|---|
+| **Symptôme** | Une cliente qui utilisait l'ancienne version voit « NaN € » à la place des prix. Tout fonctionne chez les autres. |
+| **Cause** | Le panier est conservé dans le `localStorage` du navigateur. Celui de la cliente avait été enregistré par l'ancienne version : une simple liste, sans `version` ni `quantite`. `chargerPanier` le relisait sans vérifier son format. Résultat : `prixLigne` calculait `prix * undefined`, donc `NaN`. |
+| **Hypothèses écartées** | Bouquet disparu (il donne un prix de 0, pas `NaN`), navigateur trop ancien et erreur dans le catalogue (tout marche chez les autres clientes) |
+| **Correction (option A)** | Si la `version` enregistrée n'est pas `VERSION`, la sauvegarde est ignorée et le panier repart vide. Elle est remplacée au premier affichage. |
+| **Options écartées** | B : convertir l'ancien panier, alors qu'on devine son format. C : `quantite \|\| 1`, qui masque le problème. D : A + protection contre les données illisibles, plus de code. |
+| **Incident** | Le bloc `if` avait été écrit avec `=>` au lieu d'accolades, ce qui cassait la page. L'IA l'a corrigé à ta demande. |
+| **Reste à traiter** | 1. `donnees.lignes \|\| donnees` : la partie `\|\| donnees` ne sert plus, car seul un panier version 2 arrive jusque-là. 2. Une sauvegarde abîmée (texte qui n'est pas du JSON) ferait encore planter `JSON.parse` : c'était l'option D. 3. La cliente perd son ancien panier : la fleuriste peut la prévenir. |
+
+## Méthode retenue
+- « Une seule cliente, ancienne » : chercher ce qui est **propre à son navigateur** (les données enregistrées), et pas le code commun à tout le monde.
+- Inspecter et **imiter** les données du navigateur (`localStorage`) depuis l'onglet Application et la console.
+- Faire varier **une chose à la fois** pour trouver la propriété en cause.
+- Un champ `version` sert justement à reconnaître les anciennes données.
+
+Veux-tu que je rédige la synthèse `tickets/ticket-10.md` ?
+
+
+# Ma réponse:
+
+oui, rédige la synthèse du ticket 10
+
+# Réponse:
+
+Synthèse créée : `tickets/ticket-10.md`, avec les 4 sections du modèle (symptôme, reproduction en imitant un ancien panier dans le `localStorage`, tableau des tests après correction, code concerné avec la correction retenue, les options écartées, l'incident du `=>` et ce qui reste à traiter).

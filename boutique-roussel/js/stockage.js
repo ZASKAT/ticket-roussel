@@ -16,5 +16,8 @@ export function chargerPanier() {
     return { lignes: [], codePromo: "" };
   }
   const donnees = JSON.parse(brut);
+  if (donnees.version !== VERSION) {
+    return { lignes: [], codePromo: "" };
+  }
   return { lignes: donnees.lignes || donnees, codePromo: donnees.codePromo || "" };
 }
