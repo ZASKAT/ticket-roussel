@@ -525,3 +525,97 @@ J'ai créé [ticket-2.md](boutique-roussel/tickets/ticket-2.md) avec les mêmes 
 - **ETAPES** : comment reproduire le bug, et comment confirmer la cause avec l'onglet Écouteurs d'événements.
 - **ATTENDU** : le tableau des tests, tous OK après correction.
 - **CODE_CONCERNE** : les trois fichiers impliqués, le mécanisme du doublement, la correction retenue et les options écartées, l'erreur de syntaxe pendant la correction, et le paramètre `surAction` devenu inutile.
+
+
+# Ticket 3:
+
+Ticket 3 : un bouquet absent de l'occasion « Merci »
+Bonjour, quand on choisit l'occasion « Merci », le bouquet « Le petit mot » n'apparaît pas. C'est pourtant 
+celui que je vends le plus pour dire merci ! Il est bien là quand on affiche tous les bouquets
+
+# Réponse:
+
+Le ticket te donne déjà une information précieuse : le bouquet s'affiche avec « Toutes », mais pas avec « Merci ». Le bouquet existe donc bien et l'affichage fonctionne. Le problème est dans le **tri par occasion**.
+
+## Ce que fait le code
+- Les boutons d'occasion sont créés dans `preparerFiltres` ([app.js:56](boutique-roussel/js/app.js#L56)). Chaque bouton envoie l'**`id`** de l'occasion, pas le texte affiché à l'écran (`libelle`).
+- Le tri est fait à la ligne [affichage.js:11](boutique-roussel/js/affichage.js#L11). Un bouquet est gardé si sa liste `occasions` **contient** l'id choisi. `includes` compare de façon exacte, caractère par caractère, comme la comparaison des codes promo au ticket 1.
+- Les bouquets, leurs occasions et la liste des occasions sont dans [data/catalogue.json](boutique-roussel/data/catalogue.json).
+
+## Hypothèses
+1. Le code de tri est faux.
+2. Les données de « Le petit mot » ne correspondent pas exactement à l'id de l'occasion.
+
+Pour les départager :
+- Les autres bouquets marqués « merci » apparaissent-ils quand tu choisis « Merci » ? Si oui, que dit ce résultat sur l'hypothèse 1 ?
+- Ouvre catalogue.json. Compare, caractère par caractère, les occasions de « Le petit mot » avec celles des autres bouquets « merci », puis avec l'`id` de l'occasion en bas du fichier.
+
+## Avant de corriger
+Quand tu as trouvé la cause, demande-toi **où** corriger :
+- dans les **données**, le fichier JSON ;
+- dans le **code**, en rendant le tri tolérant comme au ticket 1.
+
+Laquelle de ces corrections répond au problème réel, et laquelle masquerait une erreur de saisie ? Note tes observations dans diagnostic.md, puis donne-moi ta conclusion.
+
+
+# Ma réponse:
+
+hypothèse 2, "Merci" a une majuscule dans le JSON ce qui l'empeche de ce faire reconaitre
+
+# Réponse:
+
+Exactement. Le bouton « Merci » envoie l'id `merci`, en minuscules, alors que « Le petit mot » est enregistré avec `Merci`. La comparaison étant exacte, le bouquet n'est pas retenu. Et le fait que les autres bouquets « merci » s'affichent prouve que le code de tri, lui, fonctionne.
+
+## Où corriger
+C'est une **erreur de saisie dans les données**, donc on corrige les données : dans [catalogue.json:42](boutique-roussel/data/catalogue.json#L42), remplace `"Merci"` par `"merci"`. C'est une seule lettre, et tu peux le faire toi-même.
+
+Rendre le tri tolérant aux majuscules marcherait aussi, mais ça cacherait l'erreur au lieu de la corriger. Au ticket 1, la tolérance était justifiée : c'est la **cliente** qui tape, et on ne contrôle pas son clavier. Ici, c'est la **boutique** qui écrit les données, donc elles doivent être justes.
+
+## Le réflexe à prendre
+Une erreur de saisie trouvée, c'est souvent une erreur de saisie parmi d'autres. Avant de fermer le ticket, relis toutes les listes `occasions` de catalogue.json et compare chaque valeur aux `id` de la liste des occasions en bas du fichier. Y a-t-il un autre décalage (majuscule, faute de frappe, occasion qui n'existe pas) ?
+
+## Les tests après
+| Action | Attendu |
+|---|---|
+| Choisir « Merci » | « Le petit mot » apparaît, avec les autres bouquets « merci » |
+| Choisir « Plaisir » | « Le petit mot » apparaît toujours |
+| Choisir « Toutes » | tous les bouquets, rien de perdu |
+| Recharger la page avec `Ctrl+F5` | le JSON modifié est bien pris en compte |
+
+
+# Ma réponse:
+
+ça marche, tous les tests passent
+
+# Réponse:
+
+Bravo, le ticket 3 est résolu. J'ai vérifié ta modification dans catalogue.json : `"Merci"` est bien devenu `"merci"`.
+
+J'ai aussi relu les listes `occasions` des six bouquets. Toutes leurs valeurs correspondent maintenant à un `id` existant (anniversaire, amour, merci, mariage, plaisir). Il n'y a pas d'autre décalage.
+
+## Récapitulatif
+- **Symptôme** : « Le petit mot » n'apparaissait pas avec l'occasion « Merci », mais apparaissait avec « Toutes ».
+- **Cause** : dans catalogue.json, ce bouquet avait l'occasion `Merci` avec une majuscule, alors que le filtre compare exactement avec l'id `merci`.
+- **Correction** : dans les données, une seule lettre. Le code n'a pas été modifié.
+- **Pourquoi pas dans le code** : rendre le tri tolérant aurait caché l'erreur de saisie au lieu de la corriger.
+
+## Ce que ce ticket ajoute à ta méthode
+- **Tout bug ne vient pas du code** : les données peuvent aussi être fausses.
+- **Comparer avec ce qui marche** : les autres bouquets « merci » s'affichaient, ce qui mettait le code de tri hors de cause.
+- **Chercher les erreurs voisines** : une faute de saisie en cache souvent d'autres.
+
+Veux-tu que je synthétise le ticket 3 dans tickets/ticket-3.md ?
+
+
+# Ma réponse:
+
+oui, synthétise le ticket 3 dans ticket-3.md
+
+# Réponse:
+
+J'ai créé [ticket-3.md](boutique-roussel/tickets/ticket-3.md) avec les mêmes 4 sections que les tickets 1 et 2 :
+
+- **SYMPTOME** : « Le petit mot » absent du filtre « Merci ».
+- **ETAPES** : comment reproduire le bug, et pourquoi le code de tri n'est pas en cause.
+- **ATTENDU** : le tableau des tests, tous OK après la correction.
+- **CODE_CONCERNE** : la donnée erronée et les deux fichiers de code concernés, la correction faite dans les données, la raison pour laquelle on n'a pas rendu le tri tolérant, et la vérification des six bouquets.
